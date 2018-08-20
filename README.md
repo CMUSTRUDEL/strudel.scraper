@@ -11,4 +11,18 @@ Feel free to contribute any of those.
 
 ### Installation
 
-    easy_install --user --upgrade strudel.scraper
+    pip install --user --upgrade strudel.scraper
+
+### Usage
+
+    import stscraper as scraper
+    import pandas as pd
+
+    gh_api = scraper.GitHubAPI()
+    # so far only GiHub, Bitbucket and Gitlab are supported
+    # bb_api = scraper.BitbucketAPI()
+    # gl_api = scraper.GitLabAPI()
+
+    # repo_issues is a generator that can be used
+    # to instantiate a pandas dataframe
+    issues = pd.DataFrame(gh_api.repo_issues('cmustrudel/strudel.scraper'))

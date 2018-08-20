@@ -33,6 +33,6 @@ setup(
     packages=['stscraper'],
     license="GPL v3.0",
     author_email='marat@cmu.edu',
-    url='https://github.com/CMUSTRUDEL/strudel.scraper',
+    url='https://github.com/cmustrudel/strudel.scraper',
     install_requires=requirements
 )

@@ -3,7 +3,7 @@ from setuptools import setup
 
 requirements = [
     line.strip()
-    for line in open('requests.txt')
+    for line in open('requirements.txt')
     if line.strip() and not line.strip().startswith('#')]
 
 # options reference: https://docs.python.org/2/distutils/

@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Deprecated tools, mostly serving the purpose of examples
+"""
+
 
 import datetime
 import re

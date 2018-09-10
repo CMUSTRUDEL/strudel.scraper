@@ -100,17 +100,27 @@ def json_map(mapping, obj):
             for key, path in mapping.items()}
 
 
-def api(url, **params):
+# syntax sugar for GET API calls
+def api(url, paginate=False, **params):
     def wrapper(func):
         @wraps(func)
         def caller(self, *args):
-            mapping = func(self, *args)
-            res = self.request(url % args, **params)
-            if not isinstance(res, Iterable):
-                yield json_map(mapping, res)
+            formatted_url = url % func(self, *args)
+            if paginate:
+                return self.request(formatted_url, paginate=True, **params)
             else:
-                for item in res:
-                    yield json_map(mapping, item)
+                return self.request(formatted_url, **params).next()
+        return caller
+    return wrapper
+
+
+def api_filter(filter_func):
+    def wrapper(func):
+        @wraps(func)
+        def caller(*args):
+            for item in func(*args):
+                if filter_func(item):
+                    yield item
         return caller
     return wrapper
 
@@ -158,7 +168,6 @@ class VCSAPI(object):
     def request(self, url, method='get', data=None, paginate=False, **params):
         """ Generic, API version agnostic request method """
         timeout_counter = 0
-        paginated_res = []
         if paginate:
             params.update(self.init_pagination())
 
@@ -182,7 +191,8 @@ class VCSAPI(object):
                         "%s API returned status %s" % (
                             self.__class__.__name__, r.status_code))
                 elif r.status_code in self.status_empty:
-                    return {}
+                    yield {}
+                    return
                 elif r.status_code in self.status_internal_error:
                     timeout_counter += 1
                     if timeout_counter > self.retries_on_timeout:
@@ -192,14 +202,16 @@ class VCSAPI(object):
                 r.raise_for_status()
                 res = self.extract_result(r, paginate)
                 if paginate:
-                    paginated_res.extend(res)
+                    for item in res:
+                        yield item
                     if not res or not self.has_next_page(r):
-                        return paginated_res
+                        return
                     else:
                         params["page"] += 1
                         continue
                 else:
-                    return res
+                    yield res
+                    return
 
             next_res = min(token.when(url) for token in self.tokens)
             sleep = next_res and int(next_res - time.time()) + 1

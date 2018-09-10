@@ -2,11 +2,7 @@
 import warnings
 
 from .base import *
-
-try:
-    import settings
-except ImportError:
-    settings = object()
+import stutils
 
 
 def str_urlencode(string):
@@ -83,7 +79,13 @@ class GitLabAPI(VCSAPI):
     status_not_found = (404, 422, 451)
 
     def __init__(self, tokens=None, timeout=30):
-        tokens = tokens or getattr(settings, "SCRAPER_GITLAB_API_TOKENS", [])
+        if not tokens:
+            stconfig_tokens = stutils.get_config("GITLAB_API_TOKENS")
+            if stconfig_tokens:
+                tokens = [token.strip()
+                          for token in stconfig_tokens.split(",")
+                          if len(token.strip()) == 20]
+
         if not tokens:
             tokens = [None]
             warnings.warn("No tokens provided. GitLab API will be limited to "
@@ -95,67 +97,80 @@ class GitLabAPI(VCSAPI):
         total_pages = response.headers.get('X-Total-Pages', 0)
         return page is not None and int(page) < int(total_pages)
 
+    @api('users', paginate=True)
     def all_users(self):
-        for user in self.request('users', paginate=True):
-            yield user
+        # https://docs.gitlab.com/ee/api/users.html#list-users
+        return ()
 
+    @api('projects', paginate=True)
     def all_repos(self):
-        for repo in self.request('projects', paginate=True):
-            yield repo
+        # https://docs.gitlab.com/ee/api/projects.html#list-all-projects
+        return ()
 
+    @api('projects/%s/issues', paginate=True)
     def repo_issues(self, repo_name):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+        # https://docs.gitlab.com/ee/api/issues.html#list-project-issues
+        return str_urlencode(repo_name)
 
+    @api('projects/%s/repository/commits', paginate=True)
     def repo_commits(self, repo_name):
-        url = "projects/%s/repository/commits" % str_urlencode(repo_name)
-        for commit in self.request(url, paginate=True):
-            yield commit
+        # https://docs.gitlab.com/ee/api/commits.html#list-repository-commits
+        return str_urlencode(repo_name)
 
+    @api('projects/%s/merge_requests', paginate=True)
     def repo_pulls(self, repo_name):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+        # https://docs.gitlab.com/ee/api/merge_requests.html
+        return str_urlencode(repo_name)
 
-    def pull_request_commits(self, repo, pr_id):
-        # type: (str, int) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+    def repo_topics(self, repo_name):
+        return self.request('projects/%s' % str_urlencode(repo_name)
+                            ).next().get('tag_list', [])
 
-    def issue_comments(self, repo, issue_id):
-        # type: (str, int) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+    @api('projects/%s/merge_requests/%s/commits', paginate=True)
+    def pull_request_commits(self, repo, pr_iid):
+        # https://docs.gitlab.com/ee/api/merge_requests.html#get-single-mr-commits
+        return str_urlencode(repo), pr_iid
 
-    def review_comments(self, repo, pr_id):
-        # type: (str, int) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+    @api('projects/%s/issues/%s/notes', paginate=True)
+    def issue_comments(self, repo, issue_iid):
+        # https://docs.gitlab.com/ee/api/notes.html#list-project-issue-notes
+        return str_urlencode(repo), issue_iid
 
-    def user_info(self, username):
+    @api('projects/%s/merge_requests/%s/notes', paginate=True)
+    def review_comments(self, repo, pr_iid):
+        # https://docs.gitlab.com/ee/api/notes.html#list-all-merge-request-notes
+        return str_urlencode(repo), pr_iid
+
+    @api('users/%s')
+    def user_info(self, user):
         # https://docs.gitlab.com/ce/api/users.html#single-user
-        return self.request('users/' + username)
+        try:
+            return self.request('users', username=user).next()[0]['id']
+        except (StopIteration, IndexError):
+            raise KeyError("User does not exist")
 
+    @api('users/%s/projects', paginate=True)
     def user_repos(self, user):
-        # type: (str) -> dict
-        """Get list of user repositories"""
-        raise NotImplementedError
+        # https://docs.gitlab.com/ee/api/projects.html#list-user-projects
+        return user
+
+    @api('users/%s/events', paginate=True)
+    def user_events(self, user):
+        # https://docs.gitlab.com/ee/api/events.html#get-user-contribution-events
+        return user
 
     def user_orgs(self, user):
-        # type: (str) -> Iterable[dict]
-        """ """
+        # not available in GitLab API v4
         raise NotImplementedError
 
+    @api('/groups/%s/members/all', paginate=True)
     def org_members(self, org):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+        return str_urlencode(org)
 
+    @api('/groups/%s/projects', paginate=True)
     def org_repos(self, org):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
+        # TODO: recursive groups
+        return str_urlencode(org)
 
     @staticmethod
     def project_exists(repo_name):

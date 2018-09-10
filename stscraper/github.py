@@ -1,31 +1,12 @@
 
 import json
+import os
 import warnings
 
 from xml.etree import ElementTree
 
 from .base import *
-
-try:
-    import settings
-except ImportError:
-    settings = object()
-
-
-def parse_commit(commit):
-    github_author = commit['author'] or {}
-    commit_author = commit['commit'].get('author') or {}
-    return {
-        'sha': commit['sha'],
-        'author': github_author.get('login'),
-        'author_name': commit_author.get('name'),
-        'author_email': commit_author.get('email'),
-        'authored_date': commit_author.get('date'),
-        'message': commit['commit']['message'],
-        'committed_date': commit['commit']['committer']['date'],
-        'parents': tuple(p['sha'] for p in commit['parents']),
-        'verified': commit.get('verification', {}).get('verified')
-    }
+import stutils
 
 
 class GitHubAPIToken(APIToken):
@@ -53,7 +34,7 @@ class GitHubAPIToken(APIToken):
         return self._user
 
     def check_limits(self):
-        # regular limits will be updaated automatically upon request
+        # regular limits will be updated automatically upon request
         # we only need to take care about search limit
         try:
             stats = self('rate_limit').json()['resources']
@@ -106,24 +87,24 @@ class GitHubAPI(VCSAPI):
     tokens = None
     token_class = GitHubAPIToken
 
-    user_cookies = None  # cookies for non-API URLs
-    user_headers = {   # browser headers for non-API URLs
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept-Encoding': "gzip,deflate,br",
-        'Accept': "*/*",
-        'Origin': 'https://github.com',
-        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:60.0) "
-                      "Gecko/20100101 Firefox/60.0",
-        "Host": 'github.com',
-        "Referer": "https://github.com",
-        "DNT": "1",
-        "Accept-Language": 'en-US,en;q=0.5',
-        "Connection": "keep-alive",
-        "Cache-Control": 'max-age=0',
-    }
-
     def __init__(self, tokens=None, timeout=30):
-        tokens = tokens or getattr(settings, "SCRAPER_GITHUB_API_TOKENS", [])
+        # Where to look for tokens:
+        # strudel config variables
+        if not tokens:
+            stconfig_tokens = stutils.get_config("GITHUB_API_TOKENS")
+            if stconfig_tokens:
+                tokens = [token.strip()
+                          for token in stconfig_tokens.split(",")
+                          if len(token.strip()) == 40]
+
+        # hub configuration: https://hub.github.com/hub.1.html
+        if not tokens:
+            token = stutils.get_config("GITHUB_TOKEN")
+            if not token and os.path.isfile("~/.config/hub"):
+                token = open("~/.config/hub", 'r').read(64)
+            if token and len(token.strip()) == 40:
+                tokens = [token.strip()]
+
         if not tokens:
             tokens = [None]
             warnings.warn("No tokens provided. GitHub API will be limited to "
@@ -133,76 +114,51 @@ class GitHubAPI(VCSAPI):
 
     def has_next_page(self, response):
         for rel in response.headers.get("Link", "").split(","):
-            if rel.rsplit(";", 1)[-1] == 'rel="next"':
+            if rel.rsplit(";", 1)[-1].strip() == 'rel="next"':
                 return True
         return False
 
+    # ===================================
+    #           API methods
+    # ===================================
+    @api('users', paginate=True)
     def all_users(self):
-        for user in self.request('/users', paginate=True):
-            yield user
+        # https://developer.github.com/v3/users/#get-all-users
+        return ()
 
+    @api('repositories', paginate=True)
     def all_repos(self):
-        for repo in self.request('/repositories', paginate=True):
-            yield repo
+        # https://developer.github.com/v3/repos/#list-all-public-repositories
+        return ()
 
+    @api_filter(lambda issue: 'pull_request' not in issue)
+    @api('repos/%s/issues', paginate=True, state='all')
     def repo_issues(self, repo_name):
-        # type: (str) -> Iterable[dict]
-        url = "repos/%s/issues" % repo_name
+        # type: (Union[str, unicode]) -> Iterable[dict]
+        # https://developer.github.com/v3/issues/#list-issues-for-a-repository
+        return repo_name
 
-        data = self.request(url, paginate=True, state='all')
-
-        for issue in data:
-            if 'pull_request' not in issue:
-                yield {
-                    'author': issue['user']['login'],
-                    'closed': issue['state'] != "open",
-                    'created_at': issue['created_at'],
-                    'updated_at': issue['updated_at'],
-                    'closed_at': issue['closed_at'],
-                    'number': issue['number'],
-                    'title': issue['title'],
-                    'labels': [l['name'] for l in issue['labels']]
-                }
-
+    @api('repos/%s/commits', paginate=True)
     def repo_commits(self, repo_name):
-        url = "repos/%s/commits" % repo_name
-        for commit in self.request(url, paginate=True):
-            yield parse_commit(commit)
+        # type: (Union[str, unicode]) -> Iterable[dict]
+        # https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
+        return repo_name
 
+    @api('repos/%s/pulls', paginate=True, state='all')
     def repo_pulls(self, repo_name):
-        url = "repos/%s/pulls" % repo_name
-
-        for pr in self.request(url, paginate=True, state='all'):
-            head = pr.get('head', {})
-            head_repo = head and head.get('repo', ())
-            base = pr.get('base', {})
-            base_repo = base and base.get('repo', ())
-            yield {
-                'id': int(pr['number']),  # no idea what is in the id field
-                'title': pr['title'],
-                'body': pr['body'],
-                'labels': 'labels' in pr and [l['name'] for l in pr['labels']],
-                'created_at': pr['created_at'],
-                'updated_at': pr['updated_at'],
-                'closed_at': pr['closed_at'],
-                'merged_at': pr['merged_at'],
-                'author': pr['user']['login'],
-                'head': head_repo.get('full_name'),
-                'head_branch': head.get('label'),
-                'base': base_repo.get('full_name'),
-                'base_branch': base.get('label'),
-            }
+        # type: (Union[str, unicode]) -> Iterable[dict]
+        # https://developer.github.com/v3/pulls/#list-pull-requests
+        return repo_name
 
     def repo_topics(self, repo_name):
-        return self.request('repos/%s/topics' % repo_name).get('names')
+        return self.request('repos/%s/topics' % repo_name).next().get('names')
 
+    @api('repos/%s/pulls/%d/commits', paginate=True, state='all')
     def pull_request_commits(self, repo, pr_id):
-        # type: (str, int) -> Iterable[dict]
-        url = "repos/%s/pulls/%d/commits" % (repo, pr_id)
+        # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
+        return repo, pr_id
 
-        for commit in self.request(url, paginate=True, state='all'):
-            yield parse_commit(commit)
-
+    @api('repos/%s/issues/%s/comments', paginate=True, state='all')
     def issue_comments(self, repo, issue_id):
         """ Return comments on an issue or a pull request
         Note that for pull requests this method will return only general
@@ -212,50 +168,45 @@ class GitHubAPI(VCSAPI):
         :param repo: str 'owner/repo'
         :param issue_id: int, either an issue or a Pull Request id
         """
-        url = "repos/%s/issues/%s/comments" % (repo, issue_id)
+        # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
+        return repo, issue_id
 
-        for comment in self.request(url, paginate=True, state='all'):
-            yield {
-                'body': comment['body'],
-                'author': comment['user']['login'],
-                'created_at': comment['created_at'],
-                'updated_at': comment['updated_at'],
-            }
-
+    @api('repos/%s/pulls/%s/comments', paginate=True, state='all')
     def review_comments(self, repo, pr_id):
         """ Pull request comments attached to some code
         See also issue_comments()
         """
-        url = "repos/%s/pulls/%s/comments" % (repo, pr_id)
+        # https://developer.github.com/v3/pulls/comments/
+        return repo, pr_id
 
-        for comment in self.request(url, paginate=True, state='all'):
-            yield {
-                'id': comment['id'],
-                'body': comment['body'],
-                'author': comment['user']['login'],
-                'created_at': comment['created_at'],
-                'updated_at': comment['updated_at'],
-                'author_association': comment['author_association']
-            }
-
+    @api('users/%s')
     def user_info(self, username):
         # Docs: https://developer.github.com/v3/users/#response
-        return self.request("users/" + username)
+        return username
 
+    @api('users/%s/repos', paginate=True)
     def user_repos(self, username):
-        # type: (str) -> dict
         """Get list of user repositories"""
-        return self.request("users/%s/repos" % username, paginate=True)
+        # https://developer.github.com/v3/repos/#list-user-repositories
+        return username
 
+    @api('users/%s/orgs', paginate=True)
     def user_orgs(self, username):
-        return self.request("users/%s/orgs" % username, paginate=True)
+        # https://developer.github.com/v3/orgs/#list-user-organizations
+        return username
 
+    @api('orgs/%s/members', paginate=True)
     def org_members(self, org):
-        return self.request("orgs/%s/members" % org, paginate=True)
+        # https://developer.github.com/v3/orgs/members/#members-list
+        return org
 
+    @api('orgs/%s/repos', paginate=True)
     def org_repos(self, org):
-        return self.request("orgs/%s/repos" % org, paginate=True)
+        return org
 
+    # ===================================
+    #        Non-API methods
+    # ===================================
     @staticmethod
     def project_exists(repo_name):
         return bool(requests.head("https://github.com/" + repo_name))
@@ -288,6 +239,22 @@ class GitHubAPI(VCSAPI):
             url = url[:-4]
         return "github.com/" + url
 
+    user_cookies = None  # cookies for non-API URLs
+    user_headers = {   # browser headers for non-API URLs
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept-Encoding': "gzip,deflate,br",
+        'Accept': "*/*",
+        'Origin': 'https://github.com',
+        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:60.0) "
+                      "Gecko/20100101 Firefox/60.0",
+        "Host": 'github.com',
+        "Referer": "https://github.com",
+        "DNT": "1",
+        "Accept-Language": 'en-US,en;q=0.5',
+        "Connection": "keep-alive",
+        "Cache-Control": 'max-age=0',
+    }
+
     def user_request(self, url):
         """ Make a non-API request
         (it is used to get user activity and repo contributors)
@@ -319,9 +286,8 @@ class GitHubAPI(VCSAPI):
 
 
 class GitHubAPIv4(GitHubAPI):
-
+    """ An example class using GraphQL API """
     def v4(self, query, **params):
-        # type: (str) -> dict
         payload = json.dumps({"query": query, "variables": params})
         return self.request("graphql", 'post', data=payload)
 

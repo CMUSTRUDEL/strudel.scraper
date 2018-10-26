@@ -32,7 +32,9 @@ class TestGitHub(unittest.TestCase):
         self.assertIsInstance(issue, dict)
         for prop in ('number', 'state', 'title', 'body', 'user', 'labels',
                      'assignee', 'closed_at', 'created_at',
-                     'updated_at', 'author_association', 'locked'):
+                     'updated_at', 'author_association', 'locked',
+                     # 'reactions'
+                     ):
             self.assertIn(prop, issue,
                           "Issue object is expected to have '%s' property,"
                           " but it doesn't" % prop)
@@ -54,6 +56,14 @@ class TestGitHub(unittest.TestCase):
             self.assertIn(prop, repo,
                           "Repository object is expected to have '%s' property,"
                           " but it doesn't" % prop)
+
+    def _test_issue_event(self, event):
+        self.assertIsInstance(event, dict)
+        for prop in ('actor', 'created_at', 'event', 'url'):
+            # might also have 'label'
+            self.assertIn(prop, event,
+                          "Issue event object is expected to have '%s' property"
+                          ", but it doesn't" % prop)
 
     def test_all_users(self):
         users = self.api.all_users()
@@ -92,7 +102,11 @@ class TestGitHub(unittest.TestCase):
 
     def test_repo_topics(self):
         topics = self.api.repo_topics(self.repo_address)
-        self.assertIsInstance(topics, list)
+        self.assertIsInstance(topics, tuple)
+
+    def test_repo_labels(self):
+        labels = self.api.repo_labels(self.repo_address)
+        self.assertIsInstance(labels, tuple)
 
     def test_pull_request_commits(self):
         commits = self.api.pull_request_commits(self.repo_address, 22457)
@@ -150,6 +164,12 @@ class TestGitHub(unittest.TestCase):
         self.assertIsInstance(repos, Generator)
         repo = repos.next()
         self._test_repo(repo)
+
+    def test_issue_events(self):
+        events = self.api.issue_events('davidmarkclements/0x', 130)
+        self.assertIsInstance(events, Generator)
+        event = events.next()
+        self._test_issue_event(event)
 
     def test_pagination(self):
         # 464 commits as of Aug 2018

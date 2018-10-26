@@ -4,7 +4,8 @@ from .github import GitHubAPI
 from .gitlab import GitLabAPI
 from .bitbucket import BitbucketAPI
 
-__version__ = '0.2'
+# make sure to update setup.py
+__version__ = '0.2.1'
 __author__ = "Marat (@cmu.edu)"
 
 PROVIDERS = {

@@ -144,6 +144,15 @@ class GitHubAPI(VCSAPI):
         # https://developer.github.com/v3/issues/#list-issues-for-a-repository
         return repo_name
 
+    @api('repos/%s/issues/comments', paginate=True)
+    def repo_issue_comments(self, repo_name):
+        # type: (Union[str, unicode]) -> Iterable[dict]
+        """ Get all comments in all issues and pull requests,
+        both open and closed.
+        """
+        # https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
+        return repo_name
+
     @api('repos/%s/commits', paginate=True)
     def repo_commits(self, repo_name):
         # type: (Union[str, unicode]) -> Iterable[dict]
@@ -158,7 +167,7 @@ class GitHubAPI(VCSAPI):
 
     def repo_topics(self, repo_name):
         return tuple(
-            self.request('repos/%s/topics' % repo_name).next().get('names'))
+            next(self.request('repos/%s/topics' % repo_name)).get('names'))
 
     def repo_labels(self, repo_name):
         return tuple(label['name'] for label in

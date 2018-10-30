@@ -86,6 +86,12 @@ class TestGitHub(unittest.TestCase):
         # issues have this property while pull requests don't
         self.assertIn('comments', issue)
 
+    def test_repo_issue_comments(self):
+        comments = self.api.repo_issue_comments(self.repo_address)
+        self.assertIsInstance(comments, Generator)
+        comment = next(comments)
+        self._test_issue_comments(comment)
+
     def test_repo_commits(self):
         commits = self.api.repo_commits(self.repo_address)
         self.assertIsInstance(commits, Generator)

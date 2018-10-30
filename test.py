@@ -33,7 +33,7 @@ class TestGitHub(unittest.TestCase):
         for prop in ('number', 'state', 'title', 'body', 'user', 'labels',
                      'assignee', 'closed_at', 'created_at',
                      'updated_at', 'author_association', 'locked',
-                     # 'reactions'
+                     # 'reactions'  # omitted if there are no reactions
                      ):
             self.assertIn(prop, issue,
                           "Issue object is expected to have '%s' property,"
@@ -68,20 +68,20 @@ class TestGitHub(unittest.TestCase):
     def test_all_users(self):
         users = self.api.all_users()
         self.assertIsInstance(users, Generator)
-        user = users.next()
+        user = next(users)
         self.assertIn('login', user)
 
     def test_all_repos(self):
         repos = self.api.all_repos()
         self.assertIsInstance(repos, Generator)
-        repo = repos.next()
+        repo = next(repos)
         for prop in ('name', 'full_name', 'fork', 'owner'):
             self.assertIn(prop, repo)
 
     def test_repo_issues(self):
         issues = self.api.repo_issues(self.repo_address)
         self.assertIsInstance(issues, Generator)
-        issue = issues.next()
+        issue = next(issues)
         self._test_issue(issue)
         # issues have this property while pull requests don't
         self.assertIn('comments', issue)
@@ -89,13 +89,13 @@ class TestGitHub(unittest.TestCase):
     def test_repo_commits(self):
         commits = self.api.repo_commits(self.repo_address)
         self.assertIsInstance(commits, Generator)
-        commit = commits.next()
+        commit = next(commits)
         self._test_commits(commit)
 
     def test_repo_pulls(self):
         pulls = self.api.repo_pulls(self.repo_address)
         self.assertIsInstance(pulls, Generator)
-        pr = pulls.next()
+        pr = next(pulls)
         self._test_issue(pr)
         for prop in ('merged_at', 'head', 'base'):
             self.assertIn(prop, pr)
@@ -111,19 +111,19 @@ class TestGitHub(unittest.TestCase):
     def test_pull_request_commits(self):
         commits = self.api.pull_request_commits(self.repo_address, 22457)
         self.assertIsInstance(commits, Generator)
-        commit = commits.next()
+        commit = next(commits)
         self._test_commits(commit)
 
     def test_issue_comments(self):
         comments = self.api.issue_comments(self.repo_address, 22473)
         self.assertIsInstance(comments, Generator)
-        comment = comments.next()
+        comment = next(comments)
         self._test_issue_comments(comment)
 
     def test_review_comments(self):
         comments = self.api.review_comments(self.repo_address, 22457)
         self.assertIsInstance(comments, Generator)
-        comment = comments.next()
+        comment = next(comments)
         self._test_issue_comments(comment)
         for prop in ('diff_hunk', 'commit_id', 'position',
                      'original_position', 'path'):
@@ -142,33 +142,33 @@ class TestGitHub(unittest.TestCase):
         """Get list of user repositories"""
         repos = self.api.user_repos('pandas-dev')
         self.assertIsInstance(repos, Generator)
-        repo = repos.next()
+        repo = next(repos)
         self._test_repo(repo)
 
     def test_user_orgs(self):
         orgs = self.api.user_orgs('user2589')
         self.assertIsInstance(orgs, Generator)
-        org = orgs.next()
+        org = next(orgs)
         for prop in ('login', 'description'):
             self.assertIn(prop, org)
 
     def test_org_members(self):
         members = self.api.org_members('cmustrudel')
         self.assertIsInstance(members, Generator)
-        user = members.next()
+        user = next(members)
         for prop in ('login', 'type'):
             self.assertIn(prop, user)
 
     def test_org_repos(self):
         repos = self.api.org_repos('cmustrudel')
         self.assertIsInstance(repos, Generator)
-        repo = repos.next()
+        repo = next(repos)
         self._test_repo(repo)
 
     def test_issue_events(self):
         events = self.api.issue_events('davidmarkclements/0x', 130)
         self.assertIsInstance(events, Generator)
-        event = events.next()
+        event = next(events)
         self._test_issue_event(event)
 
     def test_pagination(self):
@@ -241,31 +241,31 @@ class TestGitLab(unittest.TestCase):
     def test_all_users(self):
         users = self.api.all_users()
         self.assertIsInstance(users, Generator)
-        user = users.next()
+        user = next(users)
         self._test_user(user)
 
     def test_all_repos(self):
         repos = self.api.all_repos()
         self.assertIsInstance(repos, Generator)
-        repo = repos.next()
+        repo = next(repos)
         self._test_repo(repo)
 
     def test_repo_issues(self):
         issues = self.api.repo_issues(self.repo_address)
         self.assertIsInstance(issues, Generator)
-        issue = issues.next()
+        issue = next(issues)
         self._test_issue(issue)
 
     def test_repo_commits(self):
         commits = self.api.repo_commits(self.repo_address)
         self.assertIsInstance(commits, Generator)
-        commit = commits.next()
+        commit = next(commits)
         self._test_commits(commit)
 
     def test_repo_pulls(self):
         pulls = self.api.repo_pulls(self.repo_address)
         self.assertIsInstance(pulls, Generator)
-        pr = pulls.next()
+        pr = next(pulls)
         self._test_issue(pr)
         for prop in ('target_branch', 'source_branch', 'source_project_id',
                      'target_project_id', 'work_in_progress', 'merge_status',
@@ -283,21 +283,21 @@ class TestGitLab(unittest.TestCase):
         # https://gitlab.com/gitlab-org/gitlab-ce/merge_requests/21628
         commits = self.api.pull_request_commits(self.repo_address, 21628)
         self.assertIsInstance(commits, Generator)
-        commit = commits.next()
+        commit = next(commits)
         self._test_commits(commit)
 
     def test_issue_comments(self):
         # https://gitlab.com/gitlab-org/gitlab-ce/issues/2978
         comments = self.api.issue_comments(self.repo_address, 2978)
         self.assertIsInstance(comments, Generator)
-        comment = comments.next()
+        comment = next(comments)
         self._test_issue_comments(comment)
 
     def test_review_comments(self):
         # https://gitlab.com/gitlab-org/gitlab-ce/merge_requests/21038
         comments = self.api.review_comments(self.repo_address, 21038)
         self.assertIsInstance(comments, Generator)
-        comment = comments.next()
+        comment = next(comments)
         self._test_issue_comments(comment)
 
     def test_user_info(self):
@@ -308,7 +308,7 @@ class TestGitLab(unittest.TestCase):
         """Get list of user repositories"""
         repos = self.api.user_repos('user2589')
         self.assertIsInstance(repos, Generator)
-        repo = repos.next()
+        repo = next(repos)
         self._test_repo(repo)
 
     def test_user_orgs(self):
@@ -319,13 +319,13 @@ class TestGitLab(unittest.TestCase):
     def test_org_members(self):
         members = self.api.org_members('Inkscape')
         self.assertIsInstance(members, Generator)
-        user = members.next()
+        user = next(members)
         self._test_user(user)
 
     def test_org_repos(self):
         repos = self.api.org_repos('gitlab-org')
         self.assertIsInstance(repos, Generator)
-        repo = repos.next()
+        repo = next(repos)
         self._test_repo(repo)
 
     def test_pagination(self):
@@ -380,20 +380,20 @@ class TestBitBucket(unittest.TestCase):
     # def test_all_users(self):
     #     users = self.api.all_users()
     #     self.assertIsInstance(users, Generator)
-    #     user = users.next()
+    #     user = next(users)
     #     self.assertIn('login', user)
     #
     # def test_all_repos(self):
     #     repos = self.api.all_repos()
     #     self.assertIsInstance(repos, Generator)
-    #     repo = repos.next()
+    #     repo = next(repos)
     #     for prop in ('name', 'full_name', 'fork', 'owner'):
     #         self.assertIn(prop, repo)
     #
     # def test_repo_issues(self):
     #     issues = self.api.repo_issues(self.repo_address)
     #     self.assertIsInstance(issues, Generator)
-    #     issue = issues.next()
+    #     issue = next(issues)
     #     self._test_issue(issue)
     #     # issues have this property while pull requests don't
     #     self.assertIn('comments', issue)
@@ -401,13 +401,13 @@ class TestBitBucket(unittest.TestCase):
     # def test_repo_commits(self):
     #     commits = self.api.repo_commits(self.repo_address)
     #     self.assertIsInstance(commits, Generator)
-    #     commit = commits.next()
+    #     commit = next(commits)
     #     self._test_commits(commit)
     #
     # def test_repo_pulls(self):
     #     pulls = self.api.repo_pulls(self.repo_address)
     #     self.assertIsInstance(pulls, Generator)
-    #     pr = pulls.next()
+    #     pr = next(pulls)
     #     self._test_issue(pr)
     #     for prop in ('merged_at', 'head', 'base'):
     #         self.assertIn(prop, pr)
@@ -419,19 +419,19 @@ class TestBitBucket(unittest.TestCase):
     # def test_pull_request_commits(self):
     #     commits = self.api.pull_request_commits(self.repo_address, 22457)
     #     self.assertIsInstance(commits, Generator)
-    #     commit = commits.next()
+    #     commit = next(commits)
     #     self._test_commits(commit)
     #
     # def test_issue_comments(self):
     #     comments = self.api.issue_comments(self.repo_address, 22473)
     #     self.assertIsInstance(comments, Generator)
-    #     comment = comments.next()
+    #     comment = next(comments)
     #     self._test_issue_comments(comment)
     #
     # def test_review_comments(self):
     #     comments = self.api.review_comments(self.repo_address, 22457)
     #     self.assertIsInstance(comments, Generator)
-    #     comment = comments.next()
+    #     comment = next(comments)
     #     self._test_issue_comments(comment)
     #     for prop in ('diff_hunk', 'commit_id', 'position',
     #                  'original_position', 'path'):
@@ -450,27 +450,27 @@ class TestBitBucket(unittest.TestCase):
     #     """Get list of user repositories"""
     #     repos = self.api.user_repos('pandas-dev')
     #     self.assertIsInstance(repos, Generator)
-    #     repo = repos.next()
+    #     repo = next(repos)
     #     self._test_repo(repo)
     #
     # def test_user_orgs(self):
     #     orgs = self.api.user_orgs('user2589')
     #     self.assertIsInstance(orgs, Generator)
-    #     org = orgs.next()
+    #     org = next(orgs)
     #     for prop in ('login', 'description'):
     #         self.assertIn(prop, org)
     #
     # def test_org_members(self):
     #     members = self.api.org_members('cmustrudel')
     #     self.assertIsInstance(members, Generator)
-    #     user = members.next()
+    #     user = next(members)
     #     for prop in ('login', 'type'):
     #         self.assertIn(prop, user)
     #
     # def test_org_repos(self):
     #     repos = self.api.org_repos('cmustrudel')
     #     self.assertIsInstance(repos, Generator)
-    #     repo = repos.next()
+    #     repo = next(repos)
     #     self._test_repo(repo)
     #
     # def test_pagination(self):

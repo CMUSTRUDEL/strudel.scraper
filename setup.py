@@ -13,7 +13,7 @@ setup(
     # whenever you're updating the next three lines
     # please also update oscar.py
     name="strudel.scraper",
-    version="0.2.1",  # make sure to update __init__.py.__version__
+    version="0.2.2",  # make sure to update __init__.py.__version__
     author='Marat (@cmu.edu)',
 
     description="Python interfaces to Github, Bitbucket and Gitlab APIs",

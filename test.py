@@ -92,6 +92,12 @@ class TestGitHub(unittest.TestCase):
         comment = next(comments)
         self._test_issue_comments(comment)
 
+    def test_repo_issue_events(self):
+        events = self.api.repo_issue_events(self.repo_address)
+        self.assertIsInstance(events, Generator)
+        event = next(events)
+        self._test_issue_event(event)
+
     def test_repo_commits(self):
         commits = self.api.repo_commits(self.repo_address)
         self.assertIsInstance(commits, Generator)

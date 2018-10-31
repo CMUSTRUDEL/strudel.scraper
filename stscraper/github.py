@@ -153,6 +153,15 @@ class GitHubAPI(VCSAPI):
         # https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
         return repo_name
 
+    @api('repos/%s/issues/events', paginate=True)
+    def repo_issue_events(self, repo_name):
+        # type: (Union[str, unicode]) -> Iterable[dict]
+        """ Get all events in all issues and pull requests,
+        both open and closed.
+        """
+        # https://developer.github.com/v3/issues/events/#list-events-for-a-repository
+        return repo_name
+
     @api('repos/%s/commits', paginate=True)
     def repo_commits(self, repo_name):
         # type: (Union[str, unicode]) -> Iterable[dict]

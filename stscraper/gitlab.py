@@ -1,4 +1,3 @@
-
 import warnings
 
 from .base import *
@@ -123,8 +122,8 @@ class GitLabAPI(VCSAPI):
         return str_urlencode(repo_name)
 
     def repo_topics(self, repo_name):
-        return self.request('projects/%s' % str_urlencode(repo_name)
-                            ).next().get('tag_list', [])
+        return next(self.request('projects/%s' % str_urlencode(repo_name))
+                    ).get('tag_list', [])
 
     @api('projects/%s/merge_requests/%s/commits', paginate=True)
     def pull_request_commits(self, repo, pr_iid):
@@ -145,7 +144,7 @@ class GitLabAPI(VCSAPI):
     def user_info(self, user):
         # https://docs.gitlab.com/ce/api/users.html#single-user
         try:
-            return self.request('users', username=user).next()[0]['id']
+            return next(self.request('users', username=user))[0]['id']
         except (StopIteration, IndexError):
             raise KeyError("User does not exist")
 
@@ -197,4 +196,3 @@ class GitLabAPI(VCSAPI):
         while url.endswith(".git"):
             url = url[:-4]
         return "gitlab.com/" + url
-

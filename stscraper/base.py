@@ -109,7 +109,7 @@ def api(url, paginate=False, **params):
             if paginate:
                 return self.request(formatted_url, paginate=True, **params)
             else:
-                return self.request(formatted_url, **params).next()
+                return next(self.request(formatted_url, **params))
         return caller
     return wrapper
 

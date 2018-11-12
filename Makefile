@@ -5,6 +5,7 @@ TESTROOT = stscraper
 .PHONY: test
 test:
 	python -m unittest test
+	python3 -m unittest test
 
 .PHONY: publish
 publish:

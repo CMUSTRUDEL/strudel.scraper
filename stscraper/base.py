@@ -180,7 +180,11 @@ class VCSAPI(object):
                     r = token(url, method=method, data=data, **params)
                 except TokenNotReady:
                     continue
-                except requests.exceptions.Timeout:
+                except requests.exceptions.RequestException:
+                    # starting early November, GitHub fails to establish
+                    # a connection once in a while (bad status line).
+                    # To account for more general issues like this,
+                    # TimeoutException was replaced with RequestException
                     timeout_counter += 1
                     if timeout_counter > self.retries_on_timeout:
                         raise

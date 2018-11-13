@@ -14,6 +14,17 @@ class TestGitHub(unittest.TestCase):
         # of both issues and commits
         self.repo_address = 'pandas-dev/pandas'
 
+    def test_tokens_identity(self):
+        # regression test: check tokens don't share identity
+        if len(self.api.tokens) < 2:
+            return
+
+        limits = {values['user']: values['core_remaining']
+                  for values in stscraper.github.get_limits()}
+
+        self.assertEqual(len(self.api.tokens), len(limits),
+                         "Number of tokens is greater than number of users")
+
     def _test_commits(self, commit):
         self.assertIsInstance(commit, dict)
         for prop in ('sha', 'commit', 'author', 'committer', 'parents'):

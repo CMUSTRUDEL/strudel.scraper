@@ -146,7 +146,7 @@ class VCSAPI(object):
         # type: (Optional[Iterable], int) -> None
         if tokens:
             self.tokens = tuple(
-                self.token_class(t, timeout=timeout) for t in tokens)
+                self.token_class(t, timeout=timeout) for t in set(tokens))
         self.logger = logging.getLogger('scraper.' + self.__class__.__name__)
 
     def has_next_page(self, response):

@@ -17,12 +17,14 @@ class GitHubAPIToken(APIToken):
     # mercy-preview: repo topics
     # squirrel-girl-preview: issue reactions
     # starfox-preview: issue events
-    _headers = {"Accept": "application/vnd.github.mercy-preview+json,"
-                          "application/vnd.github.squirrel-girl-preview,"
-                          "application/vnd.github.starfox-preview+json"}
+    _headers = None
 
     def __init__(self, token=None, timeout=None):
         super(GitHubAPIToken, self).__init__(token, timeout)
+        self._headers = {
+            "Accept": "application/vnd.github.mercy-preview+json,"
+                      "application/vnd.github.squirrel-girl-preview,"
+                      "application/vnd.github.starfox-preview+json"}
         if token is not None:
             self.token = token
             self._headers["Authorization"] = "token " + token

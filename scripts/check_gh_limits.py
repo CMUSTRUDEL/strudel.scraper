@@ -3,7 +3,6 @@
 from __future__ import print_function
 
 import argparse
-import datetime
 
 import stscraper as scraper
 
@@ -13,13 +12,10 @@ if __name__ == "__main__":
         description="Check remaining limits of registered GitHub API keys")
     args = parser.parse_args()
 
-    api = scraper.GitHubAPI()
-    now = datetime.datetime.now()
-
     columns = ("user", "core_limit", "core_remaining", "core_renews_in",
                "search_limit", "search_remaining", "search_renews_in", "key")
 
-    stats = scraper.github.get_limits()
+    stats = list(scraper.github.get_limits())
 
     lens = {column: max(max(len(str(values[column])), len(column))
                         for values in stats)

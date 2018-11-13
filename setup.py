@@ -13,8 +13,9 @@ setup(
     # whenever you're updating the next three lines
     # please also update oscar.py
     name="strudel.scraper",
-    version="0.2.4",  # make sure to update __init__.py.__version__
+    version="0.2.5",  # make sure to update __init__.py.__version__
     author='Marat (@cmu.edu)',
+    author_email='marat@cmu.edu',
 
     description="Python interfaces to Github, Bitbucket and Gitlab APIs",
     long_description=open('README.md').read(),
@@ -32,10 +33,12 @@ setup(
     ],
     platforms=["Linux", "Solaris", "Mac OS-X", "Unix", "Windows"],
     python_requires='>=2.6, !=3.0.*, !=3.1.*, !=3.2.*, <4',
-    scripts=['scripts/check_gh_limits'],
+    scripts=['scripts/check_gh_limits.py'],
+    entry_points={'console_scripts': [
+        'console_scripts = stscraper.github:print_limits',
+    ]},
     packages=['stscraper'],
     license="GPL v3.0",
-    author_email='marat@cmu.edu',
     url='https://github.com/cmustrudel/strudel.scraper',
     install_requires=requirements
 )

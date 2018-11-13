@@ -25,6 +25,25 @@ class TestGitHub(unittest.TestCase):
         self.assertEqual(len(self.api.tokens), len(limits),
                          "Number of tokens is greater than number of users")
 
+    def test_check_limits(self):
+        limits = stscraper.github.get_limits()
+        self.assertIsInstance(limits, Generator)
+
+        limits = list(limits)
+        if not limits:
+            return
+        self.assertIsInstance(limits[0], dict)
+
+    def test_check_print_limits(self):
+        import six
+        import sys
+        old_stdout = sys.stdout
+        sys.stdout = six.StringIO()
+        try:
+            stscraper.github.print_limits()
+        finally:
+            sys.stdout = old_stdout
+
     def _test_commits(self, commit):
         self.assertIsInstance(commit, dict)
         for prop in ('sha', 'commit', 'author', 'committer', 'parents'):

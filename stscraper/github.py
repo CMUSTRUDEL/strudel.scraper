@@ -92,6 +92,7 @@ class GitHubAPI(VCSAPI):
     tokens = None
     token_class = GitHubAPIToken
     base_url = 'https://github.com'
+    status_too_many_requests = (403,)
 
     def __init__(self, tokens=None, timeout=30):
         # Where to look for tokens:

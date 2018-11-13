@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 import re
 import time
-from typing import Iterable
+from typing import Iterable, Optional
 from functools import wraps
 
 
@@ -45,7 +45,7 @@ def named_url_pattern(name):
 
 
 def parse_url(url):
-    # type: (str) -> (str, str)
+    # type: (Optional[str]) -> (str, str)
     """Return provider and project id
     >>> parse_url("github.com/user/repo")
     ('github.com', 'user/repo')
@@ -131,6 +131,7 @@ class VCSAPI(object):
     tokens = None
     token_class = None
 
+    status_too_many_requests = ()
     status_not_found = (404, 451)
     status_empty = (409,)
     status_internal_error = (502, 503)
@@ -142,6 +143,7 @@ class VCSAPI(object):
         return cls._instance
 
     def __init__(self, tokens=None, timeout=30):
+        # type: (Optional[Iterable], int) -> None
         if tokens:
             self.tokens = tuple(
                 self.token_class(t, timeout=timeout) for t in tokens)
@@ -202,6 +204,13 @@ class VCSAPI(object):
                     if timeout_counter > self.retries_on_timeout:
                         raise requests.exceptions.Timeout("VCS is down")
                     continue  # i.e. try again
+                elif r.status_code in self.status_too_many_requests:
+                    timeout_counter += 1
+                    if timeout_counter > self.retries_on_timeout:
+                        raise requests.exceptions.Timeout(
+                            "Too many requests from the same IP. "
+                            "Are you abusing the API?")
+                    time.sleep(1)
 
                 r.raise_for_status()
                 res = self.extract_result(r, paginate)

@@ -1,4 +1,5 @@
 
+import datetime
 import json
 import os
 import warnings
@@ -457,3 +458,33 @@ class GitHubAPIv4(GitHubAPI):
             cursor = data["ref"]["target"]["history"]["pageInfo"]["endCursor"]
             if not data["ref"]["target"]["history"]["pageInfo"]["hasNextPage"]:
                 break
+
+
+def get_limits(tokens=None):
+    """Get human-readable rate usage limit.
+
+    Returns a generator of dictionaries with columns:
+
+    """
+    api = GitHubAPI(tokens)
+    now = datetime.now()
+
+    for i, token in enumerate(api.tokens):
+        # if limit is exhausted there is no way to get username
+        user = token.user or "<unknown%d>" % i
+        values = {'user': user, 'key': token.token}
+        token.check_limits()
+
+        for api_class in token.limits:
+            # geez, this code smells
+            next_update = token.limits[api_class]['reset']
+            if next_update is None:
+                renew = 'never'
+            else:
+                tdiff = datetime.fromtimestamp(next_update) - now
+                renew = "%dm%ds" % divmod(tdiff.seconds, 60)
+            values[api_class + '_renews_in'] = renew
+            values[api_class + '_limit'] = token.limits[api_class]['limit']
+            values[api_class + '_remaining'] = token.limits[api_class]['remaining']
+
+        yield values

@@ -15,7 +15,6 @@ import stutils
 class GitHubAPIToken(APIToken):
     api_url = "https://api.github.com/"
     api_classes = ('core', 'search')
-    status_too_many_requests = (403,)
 
     _user = None  # cache user
     # dictionaries are mutable. Don't put default headers dict here
@@ -100,6 +99,7 @@ class GitHubAPI(VCSAPI):
     tokens = None
     token_class = GitHubAPIToken
     base_url = 'https://github.com'
+    status_too_many_requests = (403,)
 
     def __init__(self, tokens=None, timeout=30):
         # Where to look for tokens:
@@ -512,7 +512,11 @@ def print_limits(argv=None):
                         for values in stats)
             for column in columns}
 
-    print(" ".join(c.ljust(lens[c] + 1, " ") for c in columns))
-    for values in stats:
-        print(" ".join(
-            str(values[c]).ljust(lens[c] + 1, " ") for c in columns))
+    def gen():
+        yield ""  # prepend empty line
+        yield " ".join(c.ljust(lens[c] + 1, " ") for c in columns)
+        for values in stats:
+            yield " ".join(
+                str(values[c]).ljust(lens[c] + 1, " ") for c in columns)
+
+    return "\n".join(gen())

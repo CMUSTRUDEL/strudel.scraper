@@ -3,6 +3,7 @@ import requests
 
 from datetime import datetime
 import logging
+import random
 import re
 import time
 from typing import Iterable, Optional
@@ -174,7 +175,11 @@ class VCSAPI(object):
             params.update(self.init_pagination())
 
         while True:
-            for token in sorted(self.tokens, key=lambda t: t.when(url)):
+            # problem with iterating them in the same order
+            # (eg, sorted by expiration): in multithreaded case,
+            # all threads are using the same token and GitHub imposes
+            # temporary limits. So, random order
+            for token in random.sample(self.tokens, len(self.tokens)):
                 if not token.ready(url):
                     continue
 
@@ -210,7 +215,8 @@ class VCSAPI(object):
                         raise requests.exceptions.Timeout(
                             "Too many requests from the same IP. "
                             "Are you abusing the API?")
-                    time.sleep(1)
+                    time.sleep(2**timeout_counter)
+                    continue
 
                 r.raise_for_status()
                 res = self.extract_result(r, paginate)

@@ -5,7 +5,7 @@ from .gitlab import GitLabAPI
 from .bitbucket import BitbucketAPI
 
 # make sure to update setup.py
-__version__ = '0.2.5'
+__version__ = '0.2.6'
 __author__ = "Marat (@cmu.edu)"
 
 PROVIDERS = {

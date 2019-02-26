@@ -1,0 +1,51 @@
+sudo: required
+language: python
+python:
+  - 2.7
+  - 3.5
+
+cache:
+  - pip
+  - packages
+
+install:
+  - make install
+  - pip install requests typing
+
+script:
+  - make test
+
+# jobs instead of deploy to deploy only once (for Python3 build)
+jobs:
+  fast_finish: true
+  include:
+  - stage: upload to PYPI, build docs and create a release
+    # python-semantic-release fails with Travis Python3.5
+    python: 2.7
+    install: make install_dev
+    script: make html
+
+    deploy:
+      - provider: script
+        skip_cleanup: true
+        on:
+          branch: master
+        script: make publish
+
+      - provider: releases
+        skip-cleanup: true
+        api_key: $GH_TOKEN
+        on:
+          tags: true
+        file: dist/*
+
+      - provider: pages
+        skip-cleanup: true
+        github-token: $GH_TOKEN
+        keep-history: true
+        on:
+          branch: master
+        local-dir: docs/build/html
+
+after_failure:
+  - pip freeze

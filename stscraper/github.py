@@ -261,7 +261,7 @@ class GitHubAPI(VCSAPI):
         # type: (str) -> str
         """ Normalize URL
         - remove trailing .git  (IMPORTANT)
-        - lowercase (API is insensitive to case, but will allow to deduplicate)
+        - lowercase (API is case insensitive, so lowercase to deduplicate)
         - prepend "github.com"
 
         :param project_url: str, user_name/repo_name
@@ -272,16 +272,15 @@ class GitHubAPI(VCSAPI):
         >>> GitHubAPI.canonical_url("http://github.com/django/django.git")
         'github.com/django/django'
         >>> GitHubAPI.canonical_url("https://github.com/A/B/")
-        'github.com/a/b/'
+        'github.com/a/b'
         """
-        url = project_url.lower()
-        for chunk in ("http://", "https://", "github.com"):
-            if url.startswith(chunk):
-                url = url[len(chunk):]
-        if url.endswith("/"):
-            url = url[:-1]
-        while url.endswith(".git"):
-            url = url[:-4]
+        url = project_url.split("//")[-1].lower()
+        for prefix in ("github.com",):
+            if url.startswith(prefix):
+                url = url[len(prefix):]
+        for suffix in ("/", ".git"):
+            if url.endswith(suffix):
+                url = url[:-len(suffix)]
         return "github.com/" + url
 
     user_cookies = None  # cookies for non-API URLs

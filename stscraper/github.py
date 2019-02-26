@@ -6,8 +6,6 @@ import json
 import os
 import warnings
 
-from xml.etree import ElementTree
-
 from .base import *
 import stutils
 
@@ -148,13 +146,13 @@ class GitHubAPI(VCSAPI):
     @api_filter(lambda issue: 'pull_request' not in issue)
     @api('repos/%s/issues', paginate=True, state='all')
     def repo_issues(self, repo_name):
-        # type: (Union[str, unicode]) -> Iterable[dict]
+        # type: (Union[str, unicode]) -> Iterator[dict]
         # https://developer.github.com/v3/issues/#list-issues-for-a-repository
         return repo_name
 
     @api('repos/%s/issues/comments', paginate=True)
     def repo_issue_comments(self, repo_name):
-        # type: (Union[str, unicode]) -> Iterable[dict]
+        # type: (Union[str, unicode]) -> Iterator[dict]
         """ Get all comments in all issues and pull requests,
         both open and closed.
         """
@@ -163,7 +161,7 @@ class GitHubAPI(VCSAPI):
 
     @api('repos/%s/issues/events', paginate=True)
     def repo_issue_events(self, repo_name):
-        # type: (Union[str, unicode]) -> Iterable[dict]
+        # type: (Union[str, unicode]) -> Iterator[dict]
         """ Get all events in all issues and pull requests,
         both open and closed.
         """
@@ -172,13 +170,13 @@ class GitHubAPI(VCSAPI):
 
     @api('repos/%s/commits', paginate=True)
     def repo_commits(self, repo_name):
-        # type: (Union[str, unicode]) -> Iterable[dict]
+        # type: (Union[str, unicode]) -> Iterator[dict]
         # https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
         return repo_name
 
     @api('repos/%s/pulls', paginate=True, state='all')
     def repo_pulls(self, repo_name):
-        # type: (Union[str, unicode]) -> Iterable[dict]
+        # type: (Union[str, unicode]) -> Iterator[dict]
         # https://developer.github.com/v3/pulls/#list-pull-requests
         return repo_name
 
@@ -283,108 +281,6 @@ class GitHubAPI(VCSAPI):
                 url = url[:-len(suffix)]
         return "github.com/" + url
 
-    user_cookies = None  # cookies for non-API URLs
-    user_headers = {   # browser headers for non-API URLs
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept-Encoding': "gzip,deflate,br",
-        'Accept': "*/*",
-        'Origin': base_url,
-        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:60.0) "
-                      "Gecko/20100101 Firefox/60.0",
-        "Host": 'github.com',
-        "Referer": base_url,
-        "DNT": "1",
-        "Accept-Language": 'en-US,en;q=0.5',
-        "Connection": "keep-alive",
-        "Cache-Control": 'max-age=0',
-    }
-
-    def user_request(self, url, headers=None):
-        """ Make a non-API request
-        (it is used to get user activity and repo contributors)
-        """
-        headers = headers or self.user_headers
-
-        if self.user_cookies is None:
-            self.user_cookies = requests.get("https://github.com").cookies
-
-        r = requests.get(url, cookies=self.user_cookies, headers=headers)
-        r.raise_for_status()
-        return r
-
-    def project_activity(self, repo_name):
-        # type: (str) -> dict
-        """Get top 100 contributors commit stats by week (non-API method)"""
-        return self.user_request(
-            "%s/%s/graphs/contributors-data" % (self.base_url, repo_name)
-        ).json()
-
-    def contributions(self, user, year):
-        # type: (str, int) -> dict
-        """ Get daily user contribution stats (non-API method)"""
-        url = "%s/users/%s/contributions?" \
-              "from=%d-12-01&to=%d-12-31&full_graph=1" % \
-              (self.base_url, user, year, year)
-        tree = ElementTree.fromstring(self.user_request(url).text)
-
-        return {rect.attrib.get('data-date'): int(rect.attrib.get('data-count'))
-                for rect in tree.iter('rect')
-                if rect.attrib.get('class') == 'day'}
-
-    def user_activity(self, user):
-        """ Get user events as a 2-tuple generator: (date, link).
-
-        Events include: commits, issues and refs creation (tags/branches).
-        This call is not subject to API rate limit.
-
-        Unfortunately, only few last months data are available.
-        """
-        import feedparser
-        import pandas as pd
-
-        def extract_links(text):
-            tree = ElementTree.fromstring(text)
-
-            date = None
-            for span in tree.iter('span'):
-                if 'f6' not in span.attrib.get('class', '').split(" "):
-                    continue
-                try:
-                    date = pd.to_datetime(span.text.strip())
-                except ValueError:
-                    continue
-                break
-
-            links = []
-            for link in tree.iter('a'):
-                href = link.attrib.get('href', '')
-                chunks = href.split("/")
-                # hrefs start with "/" so chunks[0] is an empty string
-                # this is why 'commit/issue/tree' is chunks[3], not [2]
-                if len(chunks) < 5 or \
-                        chunks[3] not in ('commit', 'issue', 'tree'):
-                    continue
-                if href not in links:
-                    links.append(href)
-                    yield (date, href)
-
-        page = None
-        while True:
-            r = requests.get('%s/%s' % (self.base_url, user),
-                             params={'page': page},
-                             headers={'Accept': 'application/atom+xml'})
-            r.raise_for_status()
-            page = 1 if page is None else page + 1
-
-            activity_log = feedparser.parse(r.text).entries
-            if not activity_log:
-                return
-
-            for record in activity_log:
-                for chunk in record['content']:
-                    for link in extract_links(chunk['value'].encode('utf8')):
-                        yield link
-
 
 class GitHubAPIv4(GitHubAPI):
     """ An example class using GraphQL API """
@@ -393,7 +289,7 @@ class GitHubAPIv4(GitHubAPI):
         return self.request("graphql", 'post', data=payload)
 
     def repo_issues(self, repo_name, cursor=None):
-        # type: (str, str) -> Iterable[dict]
+        # type: (str, str) -> Iterator[dict]
         owner, repo = repo_name.split("/")
         query = """query ($owner: String!, $repo: String!, $cursor: String) {
         repository(name: $repo, owner: $owner) {
@@ -428,7 +324,7 @@ class GitHubAPIv4(GitHubAPI):
                 break
 
     def repo_commits(self, repo_name, cursor=None):
-        # type: (str, str) -> Iterable[dict]
+        # type: (str, str) -> Iterator[dict]
         """As of June 2017 GraphQL API does not allow to get commit parents
         Until this issue is fixed this method is only left for a reference
         Please use commits() instead"""

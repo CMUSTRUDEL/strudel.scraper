@@ -250,7 +250,11 @@ class GitHubAPI(VCSAPI):
     # ===================================
     @staticmethod
     def project_exists(repo_name):
-        return bool(requests.head("https://github.com/" + repo_name))
+        for i in range(5):
+            try:
+                return bool(requests.head("https://github.com/" + repo_name))
+            except requests.RequestException:
+                time.sleep(2**i)
 
     @staticmethod
     def canonical_url(project_url):

@@ -6,7 +6,7 @@ import logging
 import random
 import re
 import time
-from typing import Iterable, Optional
+from typing import Iterable, Iterator, Optional
 from functools import wraps
 
 
@@ -142,7 +142,7 @@ class VCSAPI(object):
     status_too_many_requests = ()
     status_not_found = (404, 451)
     status_empty = (409,)
-    status_internal_error = (502, 503)
+    status_internal_error = (500, 502, 503)
     retries_on_timeout = 5
 
     def __new__(cls, *args, **kwargs):  # Singleton
@@ -215,6 +215,7 @@ class VCSAPI(object):
                     timeout_counter += 1
                     if timeout_counter > self.retries_on_timeout:
                         raise requests.exceptions.Timeout("VCS is down")
+                    time.sleep(2**timeout_counter)
                     continue  # i.e. try again
                 elif r.status_code in self.status_too_many_requests:
                     timeout_counter += 1

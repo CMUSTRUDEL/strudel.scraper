@@ -218,6 +218,10 @@ class TestGitHub(unittest.TestCase):
         commits = list(self.api.repo_commits('benjaminp/six'))
         self.assertGreater(len(commits), 463)
 
+    def test_project_exists(self):
+        self.assertTrue(self.api.project_exists(self.repo_address))
+        self.assertFalse(self.api.project_exists('user2589/nonexistent'))
+
 
 class TestGitLab(unittest.TestCase):
 
@@ -374,6 +378,10 @@ class TestGitLab(unittest.TestCase):
         # 193 commits as of Aug 2018
         commits = list(self.api.repo_commits('user2589/ghd'))
         self.assertGreater(len(commits), 190)
+
+    def test_project_exists(self):
+        self.assertTrue(self.api.project_exists(self.repo_address))
+        self.assertFalse(self.api.project_exists('user2589/nonexistent'))
 
 
 class TestBitBucket(unittest.TestCase):

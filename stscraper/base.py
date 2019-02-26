@@ -71,15 +71,22 @@ def parse_url(url):
 def json_path(obj, *path):
     """ Get a dict value by the specified path.
 
-    >>> obj = {'author': {'name': 'John'}, 'committer': None}
+    >>> obj = {'author': {'name': 'John'}, 'committer': None,
+    ...        'labels': [{'name': 'Bug'}, {'name': 'Good first issue'}]}
     >>> json_path(obj, 'author', 'name')
     'John'
     >>> json_path(obj, 'committer', 'name') is None
     True
     >>> json_path(obj, 'committer') is None
     True
+    >>> json_path(obj, 'labels', ',name')
+    'Bug,Good first issue'
     """
     for chunk in path:
+        if chunk.startswith(","):
+            obj = ",".join(str(item.get(chunk[1:])) for item in obj)
+            # supported only for the last chunk in the path, so break
+            break
         obj = obj.get(chunk)
         if obj is None:
             break

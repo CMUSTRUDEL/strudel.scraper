@@ -531,8 +531,20 @@ class TestBitBucket(unittest.TestCase):
 
 class TestGeneric(unittest.TestCase):
 
-    def test_(self):
-        pass
+    def setUp(self):
+        self.scraper = stscraper.GenericScraper()
+        self.full_url = 'https://github.com/cmustrudel/strudel.scraper'
+        self.repo_slug = 'cmustrudel/strudel.scraper'
+
+    def test_commits(self):
+        fields = stscraper.MAPPINGS['repo_commits']['fields']
+        count = 0
+        for commit in self.scraper.repo_commits(self.full_url, self.repo_slug):
+            self.assertTrue(all(field in commit for field in fields),
+                            "Some commits are missing expected fields")
+            count += 1
+        self.assertTrue(
+            count, "Zero commits returned by GenericScraper.repo_commits")
 
 
 class TestStats(unittest.TestCase):

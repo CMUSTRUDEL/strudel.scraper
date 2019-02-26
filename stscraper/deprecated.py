@@ -105,6 +105,7 @@ def commits_pygit2(repo_url, remove=True):
 
 def issues_PyGithub(github_token, repo_name):
     """ Iterate issues of a GitHub repository using GitHub API v3
+
     The library used in this method, PyGithub tries to extensively resolve
     attributes which leads to a number of excessive API calls and computation
     overhead. This implementation tries to avoid this, and was replaced by

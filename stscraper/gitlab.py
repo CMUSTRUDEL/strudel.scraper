@@ -174,8 +174,12 @@ class GitLabAPI(VCSAPI):
     @staticmethod
     def project_exists(repo_name):
         # type: (str) -> bool
-        """ """
-        return bool(requests.head("https://gitlab.com/" + repo_name))
+        """
+        Unlike GitHub, GitLab will return 302 to login page
+        for non-existing projects
+        """
+        return requests.head("https://gitlab.com/" + repo_name
+                             ).status_code < 300
 
     @staticmethod
     def canonical_url(project_url):

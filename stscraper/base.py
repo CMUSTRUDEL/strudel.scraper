@@ -259,7 +259,11 @@ class VCSAPI(object):
         """ """
         raise NotImplementedError
 
-    def repo_issues(self, repo_name):
+    def repo_info(self, repo_slug):
+        # type: (Union[str, unicode]) -> Iterator[dict]
+        raise NotImplementedError
+
+    def repo_issues(self, repo_slug):
         # type: (str) -> Iterable[dict]
         """ """
         raise NotImplementedError

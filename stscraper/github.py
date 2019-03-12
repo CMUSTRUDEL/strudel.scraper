@@ -143,6 +143,12 @@ class GitHubAPI(VCSAPI):
         # https://developer.github.com/v3/repos/#list-all-public-repositories
         return ()
 
+    @api('repos/%s')
+    def repo_info(self, repo_slug):
+        # type: (Union[str, unicode]) -> Iterator[dict]
+        # https://developer.github.com/v3/repos/#get
+        return repo_slug
+
     @api_filter(lambda issue: 'pull_request' not in issue)
     @api('repos/%s/issues', paginate=True, state='all')
     def repo_issues(self, repo_name):

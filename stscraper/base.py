@@ -268,12 +268,12 @@ class VCSAPI(object):
         """ """
         raise NotImplementedError
 
-    def repo_commits(self, repo_name):
+    def repo_commits(self, repo_slug):
         # type: (str) -> Iterable[dict]
         """ """
         raise NotImplementedError
 
-    def repo_pulls(self, repo_name):
+    def repo_pulls(self, repo_slug):
         # type: (str) -> Iterable[dict]
         """ """
         raise NotImplementedError
@@ -319,13 +319,13 @@ class VCSAPI(object):
         raise NotImplementedError
 
     @staticmethod
-    def project_exists(repo_name):
+    def project_exists(repo_slug):
         # type: (str) -> bool
         """ """
         raise NotImplementedError
 
     @staticmethod
-    def canonical_url(project_url):
+    def canonical_url(repo_slug):
         # type: (str) -> str
         """ """
         raise NotImplementedError

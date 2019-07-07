@@ -1,9 +1,4 @@
 
-from .base import *
-from .github import GitHubAPI
-from .gitlab import GitLabAPI
-from .bitbucket import BitbucketAPI
-
 """
 Standard interface to all supported code hosting platforms.
 
@@ -13,6 +8,11 @@ Two important distinctions comparing to
     `github.com/cmustrudel/strudel.scraper`.
 2. Returned objects are simplified to a common subset of fields
 """
+
+from .base import *
+from .github import GitHubAPI
+from .gitlab import GitLabAPI
+from .bitbucket import BitbucketAPI
 
 PROVIDERS = {
     "github.com": GitHubAPI,

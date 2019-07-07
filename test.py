@@ -108,6 +108,20 @@ class TestGitHub(unittest.TestCase):
         for prop in ('name', 'full_name', 'fork', 'owner'):
             self.assertIn(prop, repo)
 
+    def test_repo_info(self):
+        info = self.api.repo_info(self.repo_address)
+        self.assertIsInstance(info, dict)
+        for prop in (
+            'id', 'name', 'full_name', 'owner', 'private', 'description',
+            'fork', 'language', 'size', 'topics', 'license', 'default_branch',
+            'forks_count', 'stargazers_count', 'watchers_count',
+            'has_issues', 'has_projects', 'has_wiki', 'has_pages',
+            'has_downloads', 'created_at', 'updated_at'
+        ):
+            self.assertIn(prop, info,
+                          "Repository info is expected to have '%s' property,"
+                          " but it doesn't" % prop)
+
     def test_repo_issues(self):
         issues = self.api.repo_issues(self.repo_address)
         self.assertIsInstance(issues, Generator)
@@ -389,144 +403,6 @@ class TestBitBucket(unittest.TestCase):
     def setUp(self):
         self.api = stscraper.BitbucketAPI()
         self.repo_address = 'zzzeek/sqlalchemy'
-
-    # def _test_commits(self, commit):
-    #     for prop in ('sha', 'commit', 'author', 'committer', 'parents'):
-    #         self.assertIn(prop, commit,
-    #                       "Commit object is expected to have '%s' property,"
-    #                       " but it doesn't" % prop)
-    #     for prop in ('author', 'committer', 'message', 'comment_count'):
-    #         self.assertIn(prop, commit['commit'],
-    #                       "Commit object is expected to have 'commit.%s' "
-    #                       "property, but it doesn't" % prop)
-    #     for prop1 in ('author', 'committer'):
-    #         for prop2 in ('name', 'email', 'date'):
-    #             self.assertIn(prop2, commit['commit'][prop1])
-    #
-    # def _test_issue(self, issue):
-    #     for prop in ('number', 'state', 'title', 'body', 'user', 'labels',
-    #                  'assignee', 'closed_at', 'created_at',
-    #                  'updated_at', 'author_association', 'locked'):
-    #         self.assertIn(prop, issue,
-    #                       "Issue object is expected to have '%s' property,"
-    #                       " but it doesn't" % prop)
-    #
-    # def _test_issue_comments(self, comment):
-    #     for prop in ('body', 'user', 'created_at', 'updated_at'):
-    #         self.assertIn(prop, comment,
-    #                       "Issue comment is expected to have '%s' property,"
-    #                       " but it doesn't" % prop)
-    #
-    # def _test_repo(self, repo):
-    #     for prop in ('name', 'full_name', 'fork', 'owner',
-    #                  'has_issues', 'has_projects', 'has_wiki', 'has_pages',
-    #                  'has_downloads', 'license',
-    #                  'stargazers_count', 'forks_count', 'watchers_count',
-    #                  'pushed_at', 'created_at', 'updated_at'):
-    #         self.assertIn(prop, repo,
-    #                       "Repository object is expected to have '%s' property,"
-    #                       " but it doesn't" % prop)
-    #
-    # def test_all_users(self):
-    #     users = self.api.all_users()
-    #     self.assertIsInstance(users, Generator)
-    #     user = next(users)
-    #     self.assertIn('login', user)
-    #
-    # def test_all_repos(self):
-    #     repos = self.api.all_repos()
-    #     self.assertIsInstance(repos, Generator)
-    #     repo = next(repos)
-    #     for prop in ('name', 'full_name', 'fork', 'owner'):
-    #         self.assertIn(prop, repo)
-    #
-    # def test_repo_issues(self):
-    #     issues = self.api.repo_issues(self.repo_address)
-    #     self.assertIsInstance(issues, Generator)
-    #     issue = next(issues)
-    #     self._test_issue(issue)
-    #     # issues have this property while pull requests don't
-    #     self.assertIn('comments', issue)
-    #
-    # def test_repo_commits(self):
-    #     commits = self.api.repo_commits(self.repo_address)
-    #     self.assertIsInstance(commits, Generator)
-    #     commit = next(commits)
-    #     self._test_commits(commit)
-    #
-    # def test_repo_pulls(self):
-    #     pulls = self.api.repo_pulls(self.repo_address)
-    #     self.assertIsInstance(pulls, Generator)
-    #     pr = next(pulls)
-    #     self._test_issue(pr)
-    #     for prop in ('merged_at', 'head', 'base'):
-    #         self.assertIn(prop, pr)
-    #
-    # def test_repo_topics(self):
-    #     topics = self.api.repo_topics(self.repo_address)
-    #     self.assertIsInstance(topics, list)
-    #
-    # def test_pull_request_commits(self):
-    #     commits = self.api.pull_request_commits(self.repo_address, 22457)
-    #     self.assertIsInstance(commits, Generator)
-    #     commit = next(commits)
-    #     self._test_commits(commit)
-    #
-    # def test_issue_comments(self):
-    #     comments = self.api.issue_comments(self.repo_address, 22473)
-    #     self.assertIsInstance(comments, Generator)
-    #     comment = next(comments)
-    #     self._test_issue_comments(comment)
-    #
-    # def test_review_comments(self):
-    #     comments = self.api.review_comments(self.repo_address, 22457)
-    #     self.assertIsInstance(comments, Generator)
-    #     comment = next(comments)
-    #     self._test_issue_comments(comment)
-    #     for prop in ('diff_hunk', 'commit_id', 'position',
-    #                  'original_position', 'path'):
-    #         self.assertIn(prop, comment)
-    #
-    # def test_user_info(self):
-    #     # Docs: https://developer.github.com/v3/users/#response
-    #     user_info = self.api.user_info('pandas-dev')
-    #     self.assertIsInstance(user_info, dict)
-    #     for prop in ('login', 'type', 'name', 'company', 'blog', 'location',
-    #                  'email', 'bio', 'public_repos', 'followers', 'following',
-    #                  'created_at', 'updated_at'):
-    #         self.assertIn(prop, user_info)
-    #
-    # def test_user_repos(self):
-    #     """Get list of user repositories"""
-    #     repos = self.api.user_repos('pandas-dev')
-    #     self.assertIsInstance(repos, Generator)
-    #     repo = next(repos)
-    #     self._test_repo(repo)
-    #
-    # def test_user_orgs(self):
-    #     orgs = self.api.user_orgs('user2589')
-    #     self.assertIsInstance(orgs, Generator)
-    #     org = next(orgs)
-    #     for prop in ('login', 'description'):
-    #         self.assertIn(prop, org)
-    #
-    # def test_org_members(self):
-    #     members = self.api.org_members('cmustrudel')
-    #     self.assertIsInstance(members, Generator)
-    #     user = next(members)
-    #     for prop in ('login', 'type'):
-    #         self.assertIn(prop, user)
-    #
-    # def test_org_repos(self):
-    #     repos = self.api.org_repos('cmustrudel')
-    #     self.assertIsInstance(repos, Generator)
-    #     repo = next(repos)
-    #     self._test_repo(repo)
-    #
-    # def test_pagination(self):
-    #     # 464 commits as of Aug 2018
-    #     commits = list(self.api.repo_commits('benjaminp/six'))
-    #     self.assertGreater(len(commits), 463)
 
 
 class TestGeneric(unittest.TestCase):

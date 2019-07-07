@@ -5,6 +5,7 @@ from datetime import datetime
 import logging
 import random
 import re
+import six
 import time
 from typing import Iterable, Iterator, Optional
 from functools import wraps
@@ -147,12 +148,15 @@ class VCSAPI(object):
 
     def __new__(cls, *args, **kwargs):  # Singleton
         if not isinstance(cls._instance, cls):
-            cls._instance = super(VCSAPI, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(VCSAPI, cls).__new__(cls)
+            cls._instance.__init__(*args, **kwargs)
         return cls._instance
 
     def __init__(self, tokens=None, timeout=30):
         # type: (Optional[Iterable], int) -> None
         if tokens:
+            if isinstance(tokens, six.string_types):
+                tokens = tokens.split(",")
             self.tokens = tuple(
                 self.token_class(t, timeout=timeout) for t in set(tokens))
         self.logger = logging.getLogger('scraper.' + self.__class__.__name__)
@@ -259,17 +263,21 @@ class VCSAPI(object):
         """ """
         raise NotImplementedError
 
-    def repo_issues(self, repo_name):
+    def repo_info(self, repo_slug):
+        # type: (Union[str, unicode]) -> Iterator[dict]
+        raise NotImplementedError
+
+    def repo_issues(self, repo_slug):
         # type: (str) -> Iterable[dict]
         """ """
         raise NotImplementedError
 
-    def repo_commits(self, repo_name):
+    def repo_commits(self, repo_slug):
         # type: (str) -> Iterable[dict]
         """ """
         raise NotImplementedError
 
-    def repo_pulls(self, repo_name):
+    def repo_pulls(self, repo_slug):
         # type: (str) -> Iterable[dict]
         """ """
         raise NotImplementedError
@@ -315,13 +323,13 @@ class VCSAPI(object):
         raise NotImplementedError
 
     @staticmethod
-    def project_exists(repo_name):
+    def project_exists(repo_slug):
         # type: (str) -> bool
         """ """
         raise NotImplementedError
 
     @staticmethod
-    def canonical_url(project_url):
+    def canonical_url(repo_slug):
         # type: (str) -> str
         """ """
         raise NotImplementedError

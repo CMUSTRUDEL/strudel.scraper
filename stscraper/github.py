@@ -143,50 +143,56 @@ class GitHubAPI(VCSAPI):
         # https://developer.github.com/v3/repos/#list-all-public-repositories
         return ()
 
+    @api('repos/%s')
+    def repo_info(self, repo_slug):
+        # type: (Union[str, unicode]) -> Iterator[dict]
+        # https://developer.github.com/v3/repos/#get
+        return repo_slug
+
     @api_filter(lambda issue: 'pull_request' not in issue)
     @api('repos/%s/issues', paginate=True, state='all')
-    def repo_issues(self, repo_name):
+    def repo_issues(self, repo_slug):
         # type: (Union[str, unicode]) -> Iterator[dict]
         # https://developer.github.com/v3/issues/#list-issues-for-a-repository
-        return repo_name
+        return repo_slug
 
     @api('repos/%s/issues/comments', paginate=True)
-    def repo_issue_comments(self, repo_name):
+    def repo_issue_comments(self, repo_slug):
         # type: (Union[str, unicode]) -> Iterator[dict]
         """ Get all comments in all issues and pull requests,
         both open and closed.
         """
         # https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
-        return repo_name
+        return repo_slug
 
     @api('repos/%s/issues/events', paginate=True)
-    def repo_issue_events(self, repo_name):
+    def repo_issue_events(self, repo_slug):
         # type: (Union[str, unicode]) -> Iterator[dict]
         """ Get all events in all issues and pull requests,
         both open and closed.
         """
         # https://developer.github.com/v3/issues/events/#list-events-for-a-repository
-        return repo_name
+        return repo_slug
 
     @api('repos/%s/commits', paginate=True)
-    def repo_commits(self, repo_name):
+    def repo_commits(self, repo_slug):
         # type: (Union[str, unicode]) -> Iterator[dict]
         # https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
-        return repo_name
+        return repo_slug
 
     @api('repos/%s/pulls', paginate=True, state='all')
-    def repo_pulls(self, repo_name):
+    def repo_pulls(self, repo_slug):
         # type: (Union[str, unicode]) -> Iterator[dict]
         # https://developer.github.com/v3/pulls/#list-pull-requests
-        return repo_name
+        return repo_slug
 
-    def repo_topics(self, repo_name):
+    def repo_topics(self, repo_slug):
         return tuple(
-            next(self.request('repos/%s/topics' % repo_name)).get('names'))
+            next(self.request('repos/%s/topics' % repo_slug)).get('names'))
 
-    def repo_labels(self, repo_name):
+    def repo_labels(self, repo_slug):
         return tuple(label['name'] for label in
-                     self.request('repos/%s/labels' % repo_name, paginate=True))
+                     self.request('repos/%s/labels' % repo_slug, paginate=True))
 
     @api('repos/%s/pulls/%d/commits', paginate=True, state='all')
     def pull_request_commits(self, repo, pr_id):
@@ -247,22 +253,22 @@ class GitHubAPI(VCSAPI):
     #        Non-API methods
     # ===================================
     @staticmethod
-    def project_exists(repo_name):
+    def project_exists(repo_slug):
         for i in range(5):
             try:
-                return bool(requests.head("https://github.com/" + repo_name))
+                return bool(requests.head("https://github.com/" + repo_slug))
             except requests.RequestException:
                 time.sleep(2**i)
 
     @staticmethod
-    def canonical_url(project_url):
+    def canonical_url(repo_slug):
         # type: (str) -> str
         """ Normalize URL
         - remove trailing .git  (IMPORTANT)
         - lowercase (API is case insensitive, so lowercase to deduplicate)
         - prepend "github.com"
 
-        :param project_url: str, user_name/repo_name
+        :param: repo_slug: str, user_name/repo_name
         :return: github.com/user_name/repo_name with both names normalized
 
         >>> GitHubAPI.canonical_url("pandas-DEV/pandas")
@@ -272,7 +278,7 @@ class GitHubAPI(VCSAPI):
         >>> GitHubAPI.canonical_url("https://github.com/A/B/")
         'github.com/a/b'
         """
-        url = project_url.split("//")[-1].lower()
+        url = repo_slug.split("//")[-1].lower()
         for prefix in ("github.com",):
             if url.startswith(prefix):
                 url = url[len(prefix):]
@@ -288,9 +294,9 @@ class GitHubAPIv4(GitHubAPI):
         payload = json.dumps({"query": query, "variables": params})
         return self.request("graphql", 'post', data=payload)
 
-    def repo_issues(self, repo_name, cursor=None):
+    def repo_issues(self, repo_slug, cursor=None):
         # type: (str, str) -> Iterator[dict]
-        owner, repo = repo_name.split("/")
+        owner, repo = repo_slug.split("/")
         query = """query ($owner: String!, $repo: String!, $cursor: String) {
         repository(name: $repo, owner: $owner) {
           hasIssuesEnabled
@@ -323,12 +329,12 @@ class GitHubAPIv4(GitHubAPI):
             if not data["issues"]["pageInfo"]["hasNextPage"]:
                 break
 
-    def repo_commits(self, repo_name, cursor=None):
+    def repo_commits(self, repo_slug, cursor=None):
         # type: (str, str) -> Iterator[dict]
         """As of June 2017 GraphQL API does not allow to get commit parents
         Until this issue is fixed this method is only left for a reference
         Please use commits() instead"""
-        owner, repo = repo_name.split("/")
+        owner, repo = repo_slug.split("/")
         query = """query ($owner: String!, $repo: String!, $cursor: String) {
         repository(name: $repo, owner: $owner) {
           ref(qualifiedName: "master") {

@@ -345,6 +345,7 @@ class APIToken(object):
     _headers = {}  # request headers to use
     api_classes = ('core',)  # supported API classes (e.g. core, search etc)
     limits = None  # rate limits for API classes
+    session = None
 
     def __init__(self, token=None, timeout=None):
         self.token = token
@@ -354,6 +355,7 @@ class APIToken(object):
             'remaining': None,
             'reset_time': None
         } for api_class in self.api_classes}
+        self.session = requests.Session()
 
     @property
     def user(self):
@@ -407,7 +409,7 @@ class APIToken(object):
         if not self.ready(url):
             raise TokenNotReady
 
-        r = requests.request(
+        r = self.session.request(
             method, self.api_url + url, params=params, data=data,
             headers=self._headers,  timeout=self.timeout)
 

@@ -2,7 +2,7 @@ sudo: required
 language: python
 python:
   - 2.7
-  - 3.5
+  - 3.6
 
 cache:
   - pip
@@ -21,7 +21,7 @@ jobs:
   include:
   - stage: upload to PYPI, build docs and create a release
     # python-semantic-release fails with Travis Python3.5
-    python: 2.7
+    python: 3.6
     install: make install_dev
     script: make html
 

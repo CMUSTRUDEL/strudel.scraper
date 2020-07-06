@@ -194,6 +194,21 @@ class GitHubAPI(VCSAPI):
         return tuple(label['name'] for label in
                      self.request('repos/%s/labels' % repo_slug, paginate=True))
 
+    def repo_contributors(self, repo_slug):
+        """
+        https://developer.github.com/v3/repos/statistics/#get-all-contributor-commit-activity
+
+        Suggested use:
+            
+            
+
+        """
+        url = 'repos/pandas-dev/pandas/stats/contributors' % repo_slug
+        for contributor_stats in next(self.request(url)):
+            record = {w['w']: w['c'] for w in contributor_stats['weeks']}
+            record['user'] = json_path(contributor_stats, 'author', 'login')
+            yield record
+
     @api('repos/%s/pulls/%d/commits', paginate=True, state='all')
     def pull_request_commits(self, repo, pr_id):
         # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue

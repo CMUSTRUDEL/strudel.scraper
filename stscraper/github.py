@@ -1,9 +1,11 @@
 
+from __future__ import absolute_import
 from __future__ import print_function
 
 import datetime
 import json
 import os
+from typing import Iterable
 import warnings
 
 from .base import *
@@ -217,12 +219,12 @@ class GitHubAPI(VCSAPI):
     @api('repos/%s/issues/%s/comments', paginate=True, state='all')
     def issue_comments(self, repo, issue_id):
         """ Return comments on an issue or a pull request
-        Note that for pull requests this method will return only general
-        comments to the pull request, but not review comments related to
-        some code. Use review_comments() to get those instead
+            Note that for pull requests this method will return only general
+            comments to the pull request, but not review comments related to
+            some code. Use review_comments() to get those instead
 
-        :param repo: str 'owner/repo'
-        :param issue_id: int, either an issue or a Pull Request id
+            :param repo: str 'owner/repo'
+            :param issue_id: int, either an issue or a Pull Request id
         """
         # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
         return repo, issue_id
@@ -305,83 +307,91 @@ class GitHubAPI(VCSAPI):
 
 class GitHubAPIv4(GitHubAPI):
     """ An example class using GraphQL API """
-    def v4(self, query, **params):
-        payload = json.dumps({"query": query, "variables": params})
-        return self.request("graphql", 'post', data=payload)
+    def v4(self, query, object_path=("data",), **params):
+        """ Make an API v4 request, taking care of pagination
+
+        Args:
+            query (str): GraphQL query. If the API request is multipage, it is
+                expected that the cursor variable name is "cursor".
+            object_path (Tuple[str]): json path to objects to iterate, excluding
+                leading "data" part, and the trailing "nodes" when applicable.
+                If omitted, will return full "data" content
+                Example: "repository__issues"
+
+        Generates:
+            object: parsed object, query-specific
+        """
+
+        while True:
+            payload = json.dumps({"query": query, "variables": params})
+
+            r = self._request("graphql", 'post', data=payload)
+            if r.status_code in self.status_empty:
+                return
+
+            res = self.extract_result(r)
+            if "data" not in res:
+                raise VCSError("API didn't return any data:\n" +
+                               json.dumps(res, indent=4))
+
+            objects = json_path(res["data"], *object_path)
+            if objects is None:
+                raise VCSError("Invalid object path '%s' in:\n %s" %
+                               (object_path, json.dumps(res)))
+            if "nodes" not in objects:
+                yield objects
+                return
+            for obj in objects["nodes"]:
+                yield obj
+            # the result is single page, or there are no more pages
+            if not json_path(objects, "pageInfo", "hasNextPage"):
+                return
+            params["cursor"] = json_path(objects, "pageInfo", "endCursor")
 
     def repo_issues(self, repo_slug, cursor=None):
         # type: (str, str) -> Iterator[dict]
         owner, repo = repo_slug.split("/")
-        query = """query ($owner: String!, $repo: String!, $cursor: String) {
-        repository(name: $repo, owner: $owner) {
-          hasIssuesEnabled
-            issues (first: 100, after: $cursor,
-              orderBy: {field:CREATED_AT, direction: ASC}) {
-                nodes {author {login}, closed, createdAt,
-                       updatedAt, number, title}
-                pageInfo {endCursor, hasNextPage}
-        }}}"""
+        return self.v4("""
+            query ($owner: String!, $repo: String!, $cursor: String) {
+                repository(name: $repo, owner: $owner) {
+                  hasIssuesEnabled
+                    issues (first: 100, after: $cursor,
+                      orderBy: {field:CREATED_AT, direction: ASC}) {
+                        nodes {author {login}, closed, createdAt,
+                               updatedAt, number, title}
+                        pageInfo {endCursor, hasNextPage}
+                }}
+            }""", ("repository", "issues"), owner=owner, repo=repo)
 
-        while True:
-            data = self.v4(query, owner=owner, repo=repo, cursor=cursor
-                           )['data']['repository']
-            if not data:  # repository is empty, deleted or moved
-                break
+    def user_followers(self, user):
+        # type: (str) -> Iterator[dict]
+        return self.v4("""
+            query ($user: String!, $cursor: String) { 
+              user(login: $user) {
+                followers(first:100, after:$cursor) {
+                  nodes { login }
+                  pageInfo{endCursor, hasNextPage}
+            }}}""", ("user", "followers"), user=user)
 
-            for issue in data["issues"]:
-                yield {
-                    'author': issue['author']['login'],
-                    'closed': issue['closed'],
-                    'created_at': issue['createdAt'],
-                    'updated_at': issue['updatedAt'],
-                    'closed_at': None,
-                    'number': issue['number'],
-                    'title': issue['title']
-                }
-
-            cursor = data["issues"]["pageInfo"]["endCursor"]
-
-            if not data["issues"]["pageInfo"]["hasNextPage"]:
-                break
-
-    def repo_commits(self, repo_slug, cursor=None):
-        # type: (str, str) -> Iterator[dict]
-        """As of June 2017 GraphQL API does not allow to get commit parents
-        Until this issue is fixed this method is only left for a reference
-        Please use commits() instead"""
+    def repo_commits(self, repo_slug):
+        # type: (str) -> Iterator[dict]
         owner, repo = repo_slug.split("/")
-        query = """query ($owner: String!, $repo: String!, $cursor: String) {
-        repository(name: $repo, owner: $owner) {
-          ref(qualifiedName: "master") {
-            target { ... on Commit {
-              history (first: 100, after: $cursor) {
-                nodes {sha:oid, author {name, email, user{login}}
-                       message, committedDate}
-                pageInfo {endCursor, hasNextPage}
-        }}}}}}"""
-
-        while True:
-            data = self.v4(query, owner=owner, repo=repo, cursor=cursor
-                           )['data']['repository']
-            if not data:
-                break
-
-            for commit in data["ref"]["target"]["history"]["nodes"]:
-                yield {
-                    'sha': commit['sha'],
-                    'author': commit['author']['user']['login'],
-                    'author_name': commit['author']['name'],
-                    'author_email': commit['author']['email'],
-                    'authored_date': None,
-                    'message': commit['message'],
-                    'committed_date': commit['committedDate'],
-                    'parents': None,
-                    'verified': None
-                }
-
-            cursor = data["ref"]["target"]["history"]["pageInfo"]["endCursor"]
-            if not data["ref"]["target"]["history"]["pageInfo"]["hasNextPage"]:
-                break
+        return self.v4("""
+            query ($owner: String!, $repo: String!, $cursor: String) {
+            repository(name: $repo, owner: $owner) {
+                defaultBranchRef{ target {
+                # object(expression: "HEAD") {
+                ... on Commit {
+                    history (first: 100, after: $cursor) {
+                        nodes {sha:oid, author {name, email, user{login}}
+                               message, committedDate
+                          # normally there is only 1 parent; max observed is 3
+                          parents (first:100) {
+                            nodes {sha:oid}}
+                        }
+                        pageInfo {endCursor, hasNextPage}
+            }}}}}}""", ("repository", "defaultBranchRef", "target", "history"),
+                       owner=owner, repo=repo)
 
 
 def get_limits(tokens=None):

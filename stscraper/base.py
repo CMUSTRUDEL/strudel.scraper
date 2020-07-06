@@ -173,18 +173,21 @@ class VCSAPI(object):
         return {'page': 1, 'per_page': 100}
 
     @staticmethod
-    def extract_result(response, paginate):
+    def extract_result(response):
         """ Parse results from the response.
         For most APIs, it is just parsing JSON
         """
         return response.json()
 
-    def request(self, url, method='get', data=None, paginate=False, **params):
-        """ Generic, API version agnostic request method """
-        timeout_counter = 0
-        if paginate:
-            params.update(self.init_pagination())
+    def iterate_tokens(self, url=""):
+        """Infinite generator of tokens, taking care of their availability
 
+        Args:
+            url (str): request URL. In some API classes there are multiple rate
+                limits handled separately, e.g. GitHub general vs search API.
+        Generates:
+            (APIToken): a token object
+        """
         while True:
             # problem with iterating them in the same order
             # (eg, sorted by expiration): in multithreaded case,
@@ -193,56 +196,7 @@ class VCSAPI(object):
             for token in random.sample(self.tokens, len(self.tokens)):
                 if not token.ready(url):
                     continue
-
-                try:
-                    r = token(url, method=method, data=data, **params)
-                except TokenNotReady:
-                    continue
-                except requests.exceptions.RequestException:
-                    # starting early November, GitHub fails to establish
-                    # a connection once in a while (bad status line).
-                    # To account for more general issues like this,
-                    # TimeoutException was replaced with RequestException
-                    timeout_counter += 1
-                    if timeout_counter > self.retries_on_timeout:
-                        raise
-                    continue  # i.e. try again
-
-                if r.status_code in self.status_not_found:  # API v3 only
-                    raise RepoDoesNotExist(
-                        "%s API returned status %s" % (
-                            self.__class__.__name__, r.status_code))
-                elif r.status_code in self.status_empty:
-                    yield {}
-                    return
-                elif r.status_code in self.status_internal_error:
-                    timeout_counter += 1
-                    if timeout_counter > self.retries_on_timeout:
-                        raise requests.exceptions.Timeout("VCS is down")
-                    time.sleep(2**timeout_counter)
-                    continue  # i.e. try again
-                elif r.status_code in self.status_too_many_requests:
-                    timeout_counter += 1
-                    if timeout_counter > self.retries_on_timeout:
-                        raise requests.exceptions.Timeout(
-                            "Too many requests from the same IP. "
-                            "Are you abusing the API?")
-                    time.sleep(2**timeout_counter)
-                    continue
-
-                r.raise_for_status()
-                res = self.extract_result(r, paginate)
-                if paginate:
-                    for item in res:
-                        yield item
-                    if not res or not self.has_next_page(r):
-                        return
-                    else:
-                        params["page"] += 1
-                        continue
-                else:
-                    yield res
-                    return
+            yield token
 
             next_res = min(token.when(url) for token in self.tokens)
             sleep = next_res and int(next_res - time.time()) + 1
@@ -252,6 +206,87 @@ class VCSAPI(object):
                     datetime.now().strftime("%H:%M"), *divmod(sleep, 60))
                 time.sleep(sleep)
                 self.logger.info(".. resumed")
+
+    def request(self, url, method='get', data=None, paginate=False, **params):
+        """ Make an API request, taking care of pagination
+
+        Args:
+            url (str): request URL
+            method (str): HTTP method type
+            data (str): API request payload (for POST requests)
+            paginate (bool): flag to take care of pagination
+
+        Generates:
+            object: parsed object, API-specific
+        """
+        if paginate:
+            params.update(self.init_pagination())
+
+        while True:
+            r = self._request(url, method, data, **params)
+            if r.status_code in self.status_empty:
+                return
+
+            res = self.extract_result(r)
+            if paginate:
+                for item in res:
+                    yield item
+                if not res or not self.has_next_page(r):
+                    return
+                else:
+                    params["page"] += 1
+                    continue
+            else:
+                yield res
+                return
+
+    def _request(self, url, method='get', data=None, **params):
+        """ Make
+        Args:
+            url (str): request URL
+            method (str): HTTP method type
+            data (str): API request payload (for POST requests)
+
+        Return:
+            requests.Response: raw HTTP response
+        """
+        timeout_counter = 0
+        for token in self.iterate_tokens(url):
+            try:
+                r = token(url, method=method, data=data, **params)
+            except TokenNotReady:
+                continue
+            except requests.exceptions.RequestException:
+                # starting early November, GitHub fails to establish
+                # a connection once in a while (bad status line).
+                # To account for more general issues like this,
+                # TimeoutException was replaced with RequestException
+                timeout_counter += 1
+                if timeout_counter > self.retries_on_timeout:
+                    raise
+                continue  # i.e. try again
+
+            if r.status_code in self.status_not_found:  # API v3 only
+                raise RepoDoesNotExist(
+                    "%s API returned status %s at %s" % (
+                        self.__class__.__name__, r.status_code, url))
+            elif r.status_code in self.status_internal_error:
+                timeout_counter += 1
+                if timeout_counter > self.retries_on_timeout:
+                    raise requests.exceptions.Timeout("VCS is down")
+                time.sleep(2**timeout_counter)
+                continue  # i.e. try again
+            elif r.status_code in self.status_too_many_requests:
+                timeout_counter += 1
+                if timeout_counter > self.retries_on_timeout:
+                    raise requests.exceptions.Timeout(
+                        "Too many requests from the same IP. "
+                        "Are you abusing the API?")
+                time.sleep(1 << (timeout_counter+1))
+                continue
+
+            r.raise_for_status()
+            return r
 
     def all_users(self):
         # type: () -> Iterable[dict]

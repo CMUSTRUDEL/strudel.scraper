@@ -45,6 +45,10 @@ class GitHubAPIToken(APIToken):
                 self._user = r.json().get('login', '')
         return self._user
 
+    @property
+    def is_valid(self):
+        return self.user is not None
+
     def check_limits(self):
         # regular limits will be updated automatically upon request
         # we only need to take care about search limit
@@ -96,7 +100,6 @@ class GitHubAPI(VCSAPI):
     limits after every request. Actual work is done by outside classes, such
     as _IssueIterator and _CommitIterator
     """
-    tokens = None
     token_class = GitHubAPIToken
     base_url = 'https://github.com'
     status_too_many_requests = (403,)
@@ -307,7 +310,7 @@ class GitHubAPI(VCSAPI):
 
 class GitHubAPIv4(GitHubAPI):
     """ An example class using GraphQL API """
-    def v4(self, query, object_path=("data",), **params):
+    def v4(self, query, object_path=(), **params):
         """ Make an API v4 request, taking care of pagination
 
         Args:
@@ -372,6 +375,19 @@ class GitHubAPIv4(GitHubAPI):
                   nodes { login }
                   pageInfo{endCursor, hasNextPage}
             }}}""", ("user", "followers"), user=user)
+
+    def user_info(self, user):
+        # type: (str) -> Iterator[dict]
+        return next(self.v4("""
+            query ($user: String!) { 
+              user(login:$user) { 
+                login, name, avatarUrl, websiteUrl
+                company, bio, location, name, twitterUsername, isHireable
+                # email  # email requires extra scopes from the API key
+                createdAt, updatedAt
+                followers{totalCount}
+                following {totalCount}
+              }}""", ("user",), user=user))
 
     def repo_commits(self, repo_slug):
         # type: (str) -> Iterator[dict]

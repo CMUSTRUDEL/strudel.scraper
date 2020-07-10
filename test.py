@@ -6,6 +6,16 @@ import unittest
 import stscraper
 
 
+class TestBase(unittest.TestCase):
+
+    def test_add_keys(self):
+        api = stscraper.VCSAPI('key1,key2,key1')
+        self.assertEqual(len(api.tokens), 2)
+        api2 = stscraper.VCSAPI('key3,key1,key4')
+        self.assertTrue(api2 is api)
+        self.assertEqual(len(api.tokens), 4)
+
+
 class TestGitHub(unittest.TestCase):
 
     def setUp(self):
@@ -235,6 +245,27 @@ class TestGitHub(unittest.TestCase):
     def test_project_exists(self):
         self.assertTrue(self.api.project_exists(self.repo_address))
         self.assertFalse(self.api.project_exists('user2589/nonexistent'))
+
+
+class TestGitHubv4(unittest.TestCase):
+
+    def setUp(self):
+        self.api = stscraper.GitHubAPIv4()
+        self.repo_address = 'pandas-dev/pandas'
+
+    def test_user_info(self):
+        # Docs: https://developer.github.com/v3/users/#response
+        user_info = self.api.user_info('user2589')
+        self.assertIsInstance(user_info, dict)
+        for prop in ('login', 'name', 'avatarUrl', 'websiteUrl', 'company',
+                     'bio', 'location', 'twitterUsername',
+                     'isHireable', 'createdAt', 'updatedAt',
+                     'followers', 'following'):
+            self.assertIn(prop, user_info)
+
+    def test_pagination(self):
+        commits = list(self.api.repo_commits('benjaminp/six'))
+        self.assertGreater(len(commits), 463)
 
 
 # class TestGitLab(unittest.TestCase):

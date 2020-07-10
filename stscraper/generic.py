@@ -10,7 +10,7 @@ Two important distinctions comparing to
 """
 
 from .base import *
-from .github import GitHubAPI
+from .github import GitHubAPI, GitHubAPIv4
 from .gitlab import GitLabAPI
 from .bitbucket import BitbucketAPI
 

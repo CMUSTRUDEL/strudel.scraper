@@ -228,7 +228,7 @@ class APIToken(object):
         return r
 
     def __str__(self):
-        return self.token
+        return self.token or ""
 
 
 class DummyAPIToken(APIToken):
@@ -279,10 +279,10 @@ class VCSAPI(object):
                 tokens = tokens.split(",")
             new_tokens_instances = [self.token_class(t, timeout=timeout)
                                     for t in set(tokens) - old_tokens]
-            self.tokens += tuple(t for t in new_tokens_instances if t.is_valid)
+            self.tokens = tuple(t for t in new_tokens_instances if t.is_valid)
         self.logger = logging.getLogger('scraper.' + self.__class__.__name__)
 
-    def has_next_page(self, response):
+    def _has_next_page(self, response):
         """ Check if there is a next page to a paginated response """
         raise NotImplementedError
 
@@ -352,7 +352,7 @@ class VCSAPI(object):
             if paginate:
                 for item in res:
                     yield item
-                if not res or not self.has_next_page(r):
+                if not res or not self._has_next_page(r):
                     return
                 else:
                     params["page"] += 1
@@ -481,11 +481,5 @@ class VCSAPI(object):
     @staticmethod
     def project_exists(repo_slug):
         # type: (str) -> bool
-        """ """
-        raise NotImplementedError
-
-    @staticmethod
-    def canonical_url(repo_slug):
-        # type: (str) -> str
         """ """
         raise NotImplementedError

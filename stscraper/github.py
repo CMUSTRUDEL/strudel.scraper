@@ -129,7 +129,7 @@ class GitHubAPI(VCSAPI):
 
         super(GitHubAPI, self).__init__(tokens, timeout)
 
-    def has_next_page(self, response):
+    def _has_next_page(self, response):
         for rel in response.headers.get("Link", "").split(","):
             if rel.rsplit(";", 1)[-1].strip() == 'rel="next"':
                 return True
@@ -280,33 +280,6 @@ class GitHubAPI(VCSAPI):
             except requests.RequestException:
                 time.sleep(2**i)
 
-    @staticmethod
-    def canonical_url(repo_slug):
-        # type: (str) -> str
-        """ Normalize URL
-        - remove trailing .git  (IMPORTANT)
-        - lowercase (API is case insensitive, so lowercase to deduplicate)
-        - prepend "github.com"
-
-        :param: repo_slug: str, user_name/repo_name
-        :return: github.com/user_name/repo_name with both names normalized
-
-        >>> GitHubAPI.canonical_url("pandas-DEV/pandas")
-        'github.com/pandas-dev/pandas'
-        >>> GitHubAPI.canonical_url("http://github.com/django/django.git")
-        'github.com/django/django'
-        >>> GitHubAPI.canonical_url("https://github.com/A/B/")
-        'github.com/a/b'
-        """
-        url = repo_slug.split("//")[-1].lower()
-        for prefix in ("github.com",):
-            if url.startswith(prefix):
-                url = url[len(prefix):]
-        for suffix in ("/", ".git"):
-            if url.endswith(suffix):
-                url = url[:-len(suffix)]
-        return "github.com/" + url
-
 
 class GitHubAPIv4(GitHubAPI):
     """ An example class using GraphQL API """
@@ -442,11 +415,6 @@ def get_limits(tokens=None):
 
 def print_limits(argv=None):
     """Check remaining limits of registered GitHub API keys"""
-    # import argparse
-    # parser = argparse.ArgumentParser(
-    #     description="Check remaining limits of registered GitHub API keys")
-    # # two lines above are just to print help, so ignoring the output
-    # _ = parser.parse_args()
 
     columns = ("user", "core_limit", "core_remaining", "core_renews_in",
                "search_limit", "search_remaining", "search_renews_in",
@@ -458,11 +426,6 @@ def print_limits(argv=None):
                         for values in stats)
             for column in columns}
 
-    def gen():
-        yield ""  # prepend empty line
-        yield " ".join(c.ljust(lens[c] + 1, " ") for c in columns)
-        for values in stats:
-            yield " ".join(
-                str(values[c]).ljust(lens[c] + 1, " ") for c in columns)
-
-    return "\n".join(gen())
+    print('\n', ' '.join(c.ljust(lens[c] + 1, " ") for c in columns))
+    for values in stats:
+        print(*(str(values[c]).ljust(lens[c] + 1, " ") for c in columns))

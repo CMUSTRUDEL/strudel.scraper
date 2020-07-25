@@ -60,7 +60,7 @@ REST (v3) API
 -------------
 .. autoclass:: GitHubAPI
     :members:
-    :exclude-members:
+    :exclude-members: token_class
 
 GraphQL (v4) API
 ----------------

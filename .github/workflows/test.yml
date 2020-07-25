@@ -9,7 +9,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [2.7, 3.6, 3.7, 3.8]
+        python-version: [2.7, 3.6, 3.8]
 
     steps:
       - uses: actions/checkout@v2
@@ -30,9 +30,10 @@ jobs:
       - name: Install dependencies (Python ${{ matrix.python-version }})
         run: |
           python -m pip install --upgrade pip
+          pip install typing
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run tests on Python ${{ matrix.python-version }}
         env:
-          GITHUB_API_TOKENS: ${{ secrets.GH_API_TOKENS }}
+          GITHUB_API_TOKENS: ${{ secrets.GH_TOKENS }}
         run: make test

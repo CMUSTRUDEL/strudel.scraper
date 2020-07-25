@@ -35,5 +35,5 @@ jobs:
 
       - name: Run tests on Python ${{ matrix.python-version }}
         env:
-          GITHUB_API_TOKENS: ${{ secrets.GH_API_TOKENS }}
+          GITHUB_API_TOKENS: ${{ secrets.GITHUB_TOKEN }}
         run: make test

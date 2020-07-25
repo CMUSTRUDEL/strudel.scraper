@@ -307,7 +307,8 @@ class GitHubAPI(VCSAPI):
     @staticmethod
     def project_exists(repo_slug):
         """Check if the project exists.
-        This is a slightly cheaper alternative to getting repository info.
+        This is a slightly cheaper alternative to getting repository info. It
+        does not using API keys.
         """
         for i in range(5):
             try:

@@ -359,7 +359,7 @@ class GitHubAPIv4(GitHubAPI):
         get the first record, e.g. by calling `next()` on the result:
 
         >>> user_info = next(self.v4('''
-        ...     query ($user: String!) { 
+        ...     query ($user: String!) {
         ...       user(login:$user) {
         ...         login, name, avatarUrl, websiteUrl
         ...         company, bio, location, name, twitterUsername, isHireable

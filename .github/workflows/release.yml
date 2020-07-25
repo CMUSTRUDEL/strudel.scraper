@@ -1,0 +1,39 @@
+name: Semantic Release
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Python Semantic Release
+      uses: relekang/python-semantic-release@v7.2.1
+      with:
+        pypi_token: ${{ secrets.PYPI_TOKEN }}
+
+  pages:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: gh-pages
+          path: docs/build/html
+      - name: GitHub pages
+      - run: |
+          python -m pip install --upgrade pip
+          pip install sphinx sphinx-autobuild
+          sphinx-build -M html "docs" "docs/build"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          cd docs/build/html
+          git add .
+          git commit -m "github pages"
+          git push

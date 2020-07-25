@@ -5,7 +5,6 @@ from __future__ import print_function
 import datetime
 import json
 import os
-from typing import Iterable
 import warnings
 
 from .base import *
@@ -13,7 +12,7 @@ import stutils
 
 
 class GitHubAPIToken(APIToken):
-    api_url = "https://api.github.com/"
+    api_url = 'https://api.github.com/'
     api_classes = ('core', 'search')
 
     _user = None  # cache user
@@ -27,12 +26,12 @@ class GitHubAPIToken(APIToken):
         # squirrel-girl-preview: issue reactions
         # starfox-preview: issue events
         self._headers = {
-            "Accept": "application/vnd.github.mercy-preview+json,"
-                      "application/vnd.github.squirrel-girl-preview,"
-                      "application/vnd.github.starfox-preview+json"}
+            'Accept': 'application/vnd.github.mercy-preview+json,'
+                      'application/vnd.github.squirrel-girl-preview,'
+                      'application/vnd.github.starfox-preview+json'}
         if token is not None:
             self.token = token
-            self._headers["Authorization"] = "token " + token
+            self._headers['Authorization'] = 'token ' + token
 
     @property
     def user(self):
@@ -96,7 +95,7 @@ class GitHubAPIToken(APIToken):
 
 
 class GitHubAPI(VCSAPI):
-    """ This is a convenience class to pool GitHub API keys and update their
+    """ This is a convenience class to pool GitHub v3 API keys and update their
     limits after every request. Actual work is done by outside classes, such
     as _IssueIterator and _CommitIterator
     """
@@ -108,15 +107,16 @@ class GitHubAPI(VCSAPI):
         # Where to look for tokens:
         # strudel config variables
         if not tokens:
-            stconfig_tokens = stutils.get_config("GITHUB_API_TOKENS")
+            stconfig_tokens = stutils.get_config('GITHUB_API_TOKENS')
             if stconfig_tokens:
                 tokens = [token.strip()
                           for token in stconfig_tokens.split(",")
                           if len(token.strip()) == 40]
 
         # hub configuration: https://hub.github.com/hub.1.html
+        # also, used by github actions
         if not tokens:
-            token = stutils.get_config("GITHUB_TOKEN")
+            token = stutils.get_config('GITHUB_TOKEN')
             if not token and os.path.isfile("~/.config/hub"):
                 token = open("~/.config/hub", 'r').read(64)
             if token and len(token.strip()) == 40:
@@ -140,30 +140,31 @@ class GitHubAPI(VCSAPI):
     # ===================================
     @api('users', paginate=True)
     def all_users(self):
+        """Get all GitHub users"""
         # https://developer.github.com/v3/users/#get-all-users
         return ()
 
     @api('repositories', paginate=True)
     def all_repos(self):
+        """Get all GitHub repositories"""
         # https://developer.github.com/v3/repos/#list-all-public-repositories
         return ()
 
     @api('repos/%s')
     def repo_info(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
+        """Get repository info"""
         # https://developer.github.com/v3/repos/#get
         return repo_slug
 
     @api_filter(lambda issue: 'pull_request' not in issue)
     @api('repos/%s/issues', paginate=True, state='all')
     def repo_issues(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
+        """Get repository issues (not including pull requests)"""
         # https://developer.github.com/v3/issues/#list-issues-for-a-repository
         return repo_slug
 
     @api('repos/%s/issues/comments', paginate=True)
     def repo_issue_comments(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
         """ Get all comments in all issues and pull requests,
         both open and closed.
         """
@@ -172,7 +173,6 @@ class GitHubAPI(VCSAPI):
 
     @api('repos/%s/issues/events', paginate=True)
     def repo_issue_events(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
         """ Get all events in all issues and pull requests,
         both open and closed.
         """
@@ -181,34 +181,56 @@ class GitHubAPI(VCSAPI):
 
     @api('repos/%s/commits', paginate=True)
     def repo_commits(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
+        """Get all repository commits.
+        Note that GitHub API might ignore some merge commits"""
         # https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
         return repo_slug
 
     @api('repos/%s/pulls', paginate=True, state='all')
     def repo_pulls(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
+        """Get all repository pull requests.
+        Unlike the issues API, this method will return information specific for
+        pull requests, like head SHAs and branch names."""
         # https://developer.github.com/v3/pulls/#list-pull-requests
         return repo_slug
 
     def repo_topics(self, repo_slug):
+        """Get a tuple of repository topics.
+        Topics are "keywords" assigned by repository owner.
+
+        >>> GitHubAPI().repo_topics('pandas-dev/pandas')
+        ('data-analysis', 'pandas', 'flexible', 'alignment', 'python')
+        """
         return tuple(
             next(self.request('repos/%s/topics' % repo_slug)).get('names'))
 
     def repo_labels(self, repo_slug):
+        """Get a tuple of repository labels.
+        Labels are issue tags used by maintainers
+
+        >>> GitHubAPI().repo_labels('pandas-dev/pandas')[:5]
+        ('2/3 Compat', '32bit', 'API - Consistency', 'API Design', 'Admin')
+        """
         return tuple(label['name'] for label in
                      self.request('repos/%s/labels' % repo_slug, paginate=True))
 
     def repo_contributors(self, repo_slug):
-        """
-        https://developer.github.com/v3/repos/statistics/#get-all-contributor-commit-activity
+        """Get a timeline of up to 100 top project contributors
 
         Suggested use:
-            
-            
 
+        >>> import pandas as pd
+        >>> df = pd.DataFrame(
+        ...     GitHubAPI().repo_contributors(repo_slug)).set_index('user')
+        >>> df.columns = pd.to_datetime(df.columns, unit='s')
+        >>> df
+                  2018-08-19  2018-08-26    ...    2020-07-12  2020-07-19
+        user                                ...
+        user2589           3           0    ...             0           0
+        ...
         """
-        url = 'repos/pandas-dev/pandas/stats/contributors' % repo_slug
+        # https://developer.github.com/v3/repos/statistics/#get-all-contributor-commit-activity
+        url = 'repos/%s/stats/contributors' % repo_slug
         for contributor_stats in next(self.request(url)):
             record = {w['w']: w['c'] for w in contributor_stats['weeks']}
             record['user'] = json_path(contributor_stats, 'author', 'login')
@@ -216,32 +238,33 @@ class GitHubAPI(VCSAPI):
 
     @api('repos/%s/pulls/%d/commits', paginate=True, state='all')
     def pull_request_commits(self, repo, pr_id):
+        """Get commits in a pull request.
+        `pr_id` is the visible pull request number, not internal GitHub id.
+        """
         # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
         return repo, pr_id
 
     @api('repos/%s/issues/%s/comments', paginate=True, state='all')
     def issue_comments(self, repo, issue_id):
-        """ Return comments on an issue or a pull request
-            Note that for pull requests this method will return only general
-            comments to the pull request, but not review comments related to
-            some code. Use review_comments() to get those instead
-
-            :param repo: str 'owner/repo'
-            :param issue_id: int, either an issue or a Pull Request id
+        """ Get comments on an issue or a pull request.
+        Note that for pull requests this method will return only general
+        comments to the pull request, but not review comments related to some
+        code. Use review_comments() to get those instead.
         """
         # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
         return repo, issue_id
 
     @api('repos/%s/pulls/%s/comments', paginate=True, state='all')
     def review_comments(self, repo, pr_id):
-        """ Pull request comments attached to some code
-        See also issue_comments()
+        """ Get pull request comments related to some code.
+        This will not return general comments, see `issue_comments()`
         """
         # https://developer.github.com/v3/pulls/comments/
         return repo, pr_id
 
     @api('users/%s')
     def user_info(self, username):
+        """Get user info - name, location, blog etc."""
         # Docs: https://developer.github.com/v3/users/#response
         return username
 
@@ -253,20 +276,29 @@ class GitHubAPI(VCSAPI):
 
     @api('users/%s/orgs', paginate=True)
     def user_orgs(self, username):
+        """Get user organization membership.
+        Usually includes only public memberships, but for yourself you get
+        non-public as well."""
         # https://developer.github.com/v3/orgs/#list-user-organizations
         return username
 
     @api('orgs/%s/members', paginate=True)
     def org_members(self, org):
+        """Get public organization members.
+        Note that if you are a member of the organization you'll get everybody.
+        """
         # https://developer.github.com/v3/orgs/members/#members-list
         return org
 
     @api('orgs/%s/repos', paginate=True)
     def org_repos(self, org):
+        """Get organization repositories"""
         return org
 
     @api('repos/%s/issues/%d/events', paginate=True)
     def issue_events(self, repo, issue_no):
+        """Get issue events.
+        This includes state changes, references, labels etc. """
         return repo, issue_no
 
     # ===================================
@@ -274,6 +306,9 @@ class GitHubAPI(VCSAPI):
     # ===================================
     @staticmethod
     def project_exists(repo_slug):
+        """Check if the project exists.
+        This is a slightly cheaper alternative to getting repository info.
+        """
         for i in range(5):
             try:
                 return bool(requests.head("https://github.com/" + repo_slug))
@@ -282,7 +317,12 @@ class GitHubAPI(VCSAPI):
 
 
 class GitHubAPIv4(GitHubAPI):
-    """ An example class using GraphQL API """
+    """ An interface to GitHub v4 GraphQL API.
+
+    Due to the nature of graphql API, this class does not provide a specific
+    set of methods. Instead, you're expected to write your own queries and this
+    class will help you with pagination and network timeouts.
+    """
     def v4(self, query, object_path=(), **params):
         """ Make an API v4 request, taking care of pagination
 
@@ -292,41 +332,72 @@ class GitHubAPIv4(GitHubAPI):
             object_path (Tuple[str]): json path to objects to iterate, excluding
                 leading "data" part, and the trailing "nodes" when applicable.
                 If omitted, will return full "data" content
-                Example: "repository__issues"
+                Example: ("repository", "issues")
+            **params: dictionary of query variables.
 
-        Generates:
+        Yields:
             object: parsed object, query-specific
+
+        This method always returns an iterator, so normally you just throw it
+        straint into a loop:
+
+        >>> followers = GitHubAPIv4().v4('''
+        ...     query ($user: String!, $cursor: String) {
+        ...       user(login: $user) {
+        ...         followers(first:100, after:$cursor) {
+        ...           nodes { login }
+        ...           pageInfo{endCursor, hasNextPage}
+        ...     }}}''', ("user", "followers"), user=user)
+        >>> for follower in followers:
+        ...     pass
+
+        The method will look for `pageInfo` object in the object path and handle
+        pagination transparently.
+
+        However, the method will also return an iterator if the query is
+        expected to return a single result. In this case, you need to explicitly
+        get the first record, e.g. by calling `next()` on the result:
+
+        >>> user_info = next(self.v4('''
+        ...     query ($user: String!) { 
+        ...       user(login:$user) {
+        ...         login, name, avatarUrl, websiteUrl
+        ...         company, bio, location, name, twitterUsername, isHireable
+        ...         createdAt, updatedAt
+        ...         followers{totalCount}
+        ...         following {totalCount}
+        ...       }}''', ('user',), user=user))
+
         """
 
         while True:
-            payload = json.dumps({"query": query, "variables": params})
+            payload = json.dumps({'query': query, 'variables': params})
 
-            r = self._request("graphql", 'post', data=payload)
+            r = self._request('graphql', 'post', data=payload)
             if r.status_code in self.status_empty:
                 return
 
             res = self.extract_result(r)
-            if "data" not in res:
-                raise VCSError("API didn't return any data:\n" +
+            if 'data' not in res:
+                raise VCSError('API didn\'t return any data:\n' +
                                json.dumps(res, indent=4))
 
-            objects = json_path(res["data"], *object_path)
+            objects = json_path(res['data'], *object_path)
             if objects is None:
-                raise VCSError("Invalid object path '%s' in:\n %s" %
+                raise VCSError('Invalid object path "%s" in:\n %s' %
                                (object_path, json.dumps(res)))
-            if "nodes" not in objects:
+            if 'nodes' not in objects:
                 yield objects
                 return
-            for obj in objects["nodes"]:
+            for obj in objects['nodes']:
                 yield obj
             # the result is single page, or there are no more pages
-            if not json_path(objects, "pageInfo", "hasNextPage"):
+            if not json_path(objects, 'pageInfo', 'hasNextPage'):
                 return
-            params["cursor"] = json_path(objects, "pageInfo", "endCursor")
+            params['cursor'] = json_path(objects, 'pageInfo', 'endCursor')
 
     def repo_issues(self, repo_slug, cursor=None):
-        # type: (str, str) -> Iterator[dict]
-        owner, repo = repo_slug.split("/")
+        owner, repo = repo_slug.split('/')
         return self.v4("""
             query ($owner: String!, $repo: String!, $cursor: String) {
                 repository(name: $repo, owner: $owner) {
@@ -337,20 +408,18 @@ class GitHubAPIv4(GitHubAPI):
                                updatedAt, number, title}
                         pageInfo {endCursor, hasNextPage}
                 }}
-            }""", ("repository", "issues"), owner=owner, repo=repo)
+            }""", ('repository', 'issues'), owner=owner, repo=repo)
 
     def user_followers(self, user):
-        # type: (str) -> Iterator[dict]
         return self.v4("""
             query ($user: String!, $cursor: String) { 
               user(login: $user) {
                 followers(first:100, after:$cursor) {
                   nodes { login }
                   pageInfo{endCursor, hasNextPage}
-            }}}""", ("user", "followers"), user=user)
+            }}}""", ('user', 'followers'), user=user)
 
     def user_info(self, user):
-        # type: (str) -> Iterator[dict]
         return next(self.v4("""
             query ($user: String!) { 
               user(login:$user) { 
@@ -360,10 +429,9 @@ class GitHubAPIv4(GitHubAPI):
                 createdAt, updatedAt
                 followers{totalCount}
                 following {totalCount}
-              }}""", ("user",), user=user))
+              }}""", ('user',), user=user))
 
     def repo_commits(self, repo_slug):
-        # type: (str) -> Iterator[dict]
         owner, repo = repo_slug.split("/")
         return self.v4("""
             query ($owner: String!, $repo: String!, $cursor: String) {
@@ -379,7 +447,7 @@ class GitHubAPIv4(GitHubAPI):
                             nodes {sha:oid}}
                         }
                         pageInfo {endCursor, hasNextPage}
-            }}}}}}""", ("repository", "defaultBranchRef", "target", "history"),
+            }}}}}}""", ('repository', 'defaultBranchRef', 'target', 'history'),
                        owner=owner, repo=repo)
 
 
@@ -394,18 +462,17 @@ def get_limits(tokens=None):
 
     for i, token in enumerate(api.tokens):
         # if limit is exhausted there is no way to get username
-        user = token.user or "<unknown%d>" % i
+        user = token.user or '<unknown%d>' % i
         values = {'user': user, 'key': token.token}
         token.check_limits()
 
         for api_class in token.limits:
-            # geez, this code smells
             next_update = token.limits[api_class]['reset']
             if next_update is None:
                 renew = 'never'
             else:
                 tdiff = datetime.fromtimestamp(next_update) - now
-                renew = "%dm%ds" % divmod(tdiff.seconds, 60)
+                renew = '%dm%ds' % divmod(tdiff.seconds, 60)
             values[api_class + '_renews_in'] = renew
             values[api_class + '_limit'] = token.limits[api_class]['limit']
             values[api_class + '_remaining'] = token.limits[api_class]['remaining']
@@ -416,9 +483,9 @@ def get_limits(tokens=None):
 def print_limits(argv=None):
     """Check remaining limits of registered GitHub API keys"""
 
-    columns = ("user", "core_limit", "core_remaining", "core_renews_in",
-               "search_limit", "search_remaining", "search_renews_in",
-               "key")
+    columns = ('user', 'core_limit', 'core_remaining', 'core_renews_in',
+               'search_limit', 'search_remaining', 'search_renews_in',
+               'key')
 
     stats = list(get_limits())
 

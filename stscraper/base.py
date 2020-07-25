@@ -279,7 +279,7 @@ class VCSAPI(object):
                 tokens = tokens.split(",")
             new_tokens_instances = [self.token_class(t, timeout=timeout)
                                     for t in set(tokens) - old_tokens]
-            self.tokens = tuple(t for t in new_tokens_instances if t.is_valid)
+            self.tokens += tuple(t for t in new_tokens_instances if t.is_valid)
         self.logger = logging.getLogger('scraper.' + self.__class__.__name__)
 
     def _has_next_page(self, response):
@@ -317,7 +317,7 @@ class VCSAPI(object):
             for token in random.sample(self.tokens, len(self.tokens)):
                 if not token.ready(url):
                     continue
-            yield token
+                yield token
 
             next_res = min(token.when(url) for token in self.tokens)
             sleep = next_res and int(next_res - time.time()) + 1

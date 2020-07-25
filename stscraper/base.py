@@ -1,4 +1,6 @@
 
+from __future__ import absolute_import
+
 import requests
 
 from datetime import datetime
@@ -7,7 +9,7 @@ import random
 import re
 import six
 import time
-from typing import Iterable, Iterator, Optional
+from typing import Iterable, Iterator, Optional, Tuple, Union
 from functools import wraps
 
 
@@ -134,11 +136,127 @@ def api_filter(filter_func):
     return wrapper
 
 
+class APIToken(object):
+    """ An abstract container for an API token
+    """
+    # API endpoint
+    api_url = None  # type: str
+
+    token = None  # type: str
+    # number of seconds before throwing IOError
+    timeout = None  # type: int
+    # request headers to use
+    _headers = {}  # type: dict
+    # supported API classes (e.g. core, search etc)
+    api_classes = ('core',)  # type: Tuple
+    # rate limits for API classes
+    limits = None  # type: dict
+    session = None  # type: requests.Session
+
+    def __init__(self, token=None, timeout=None):
+        self.token = token
+        self.timeout = timeout
+        self.limits = {api_class: {
+            'limit': None,
+            'remaining': None,
+            'reset_time': None
+        } for api_class in self.api_classes}
+        self.session = requests.Session()
+
+    @property
+    def is_valid(self):
+        raise NotImplementedError
+
+    @property
+    def user(self):
+        """ Get user info of the token owner """
+        raise NotImplementedError
+
+    def _update_limits(self, response, url):
+        raise NotImplementedError
+
+    def check_limits(self):
+        """ Get information about remaining limits on the token.
+
+        Usually this information present in response headers and updated
+        automatically (see _update_limits()). This method is intended to
+        FORCE to renew this info.
+
+        Some APIs have multiple classes of limits, so it should return a list
+        of dictionaries
+        { <api_class>: {
+                'remaining': remaining number of requests until reset,
+                'limit': overall limit,
+                'reset_time': unix_timestamp
+            },
+            ...
+         }
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def api_class(url):
+        # type: (str) -> str
+        return 'core'
+
+    def when(self, url):
+        # type: (str) -> int
+        """Check when the specified URL become accessible without blocking
+
+        Returns: unix timestamp
+        """
+        raise NotImplementedError
+
+    def ready(self, url):
+        """ Check if this url can be called without blocking """
+        t = self.when(url)
+        return not t or t <= time.time()
+
+    def __call__(self, url, method='get', data=None, **params):
+        """ Make an API request """
+        # TODO: use coroutines, perhaps Tornado (as PY2/3 compatible)
+
+        if not self.ready(url):
+            raise TokenNotReady
+
+        r = self.session.request(
+            method, self.api_url + url, params=params, data=data,
+            headers=self._headers,  timeout=self.timeout)
+
+        self._update_limits(r, url)
+
+        return r
+
+    def __str__(self):
+        return self.token or ""
+
+
+class DummyAPIToken(APIToken):
+    """ A dummy token class that does nothing
+    APIs that don't have limits should use tokens subclassed from this one
+    """
+
+    is_valid = True
+    user = 'Anonymous'
+
+    def check_limits(self):
+        return self.limits
+
+    def ready(self, url):
+        return True
+
+    def when(self, url):
+        return None
+
+    def _update_limits(self, response, url):
+        pass
+
+
 class VCSAPI(object):
     _instance = None  # instance of API() for Singleton pattern implementation
 
-    tokens = None
-    token_class = None
+    tokens = ()  # type: Tuple[APIToken]
+    token_class = DummyAPIToken  # type: type
 
     status_too_many_requests = ()
     status_not_found = (404, 451)
@@ -149,19 +267,22 @@ class VCSAPI(object):
     def __new__(cls, *args, **kwargs):  # Singleton
         if not isinstance(cls._instance, cls):
             cls._instance = super(VCSAPI, cls).__new__(cls)
-            cls._instance.__init__(*args, **kwargs)
+
+        cls._instance.__init__(*args, **kwargs)
         return cls._instance
 
     def __init__(self, tokens=None, timeout=30):
-        # type: (Optional[Iterable], int) -> None
+        # type: (Optional[Union[Iterable,str]], int) -> None
+        old_tokens = {str(token) for token in self.tokens}
         if tokens:
             if isinstance(tokens, six.string_types):
                 tokens = tokens.split(",")
-            self.tokens = tuple(
-                self.token_class(t, timeout=timeout) for t in set(tokens))
+            new_tokens_instances = [self.token_class(t, timeout=timeout)
+                                    for t in set(tokens) - old_tokens]
+            self.tokens += tuple(t for t in new_tokens_instances if t.is_valid)
         self.logger = logging.getLogger('scraper.' + self.__class__.__name__)
 
-    def has_next_page(self, response):
+    def _has_next_page(self, response):
         """ Check if there is a next page to a paginated response """
         raise NotImplementedError
 
@@ -173,18 +294,21 @@ class VCSAPI(object):
         return {'page': 1, 'per_page': 100}
 
     @staticmethod
-    def extract_result(response, paginate):
+    def extract_result(response):
         """ Parse results from the response.
         For most APIs, it is just parsing JSON
         """
         return response.json()
 
-    def request(self, url, method='get', data=None, paginate=False, **params):
-        """ Generic, API version agnostic request method """
-        timeout_counter = 0
-        if paginate:
-            params.update(self.init_pagination())
+    def iterate_tokens(self, url=""):
+        """Infinite generator of tokens, taking care of their availability
 
+        Args:
+            url (str): request URL. In some API classes there are multiple rate
+                limits handled separately, e.g. GitHub general vs search API.
+        Generates:
+            (APIToken): a token object
+        """
         while True:
             # problem with iterating them in the same order
             # (eg, sorted by expiration): in multithreaded case,
@@ -193,56 +317,7 @@ class VCSAPI(object):
             for token in random.sample(self.tokens, len(self.tokens)):
                 if not token.ready(url):
                     continue
-
-                try:
-                    r = token(url, method=method, data=data, **params)
-                except TokenNotReady:
-                    continue
-                except requests.exceptions.RequestException:
-                    # starting early November, GitHub fails to establish
-                    # a connection once in a while (bad status line).
-                    # To account for more general issues like this,
-                    # TimeoutException was replaced with RequestException
-                    timeout_counter += 1
-                    if timeout_counter > self.retries_on_timeout:
-                        raise
-                    continue  # i.e. try again
-
-                if r.status_code in self.status_not_found:  # API v3 only
-                    raise RepoDoesNotExist(
-                        "%s API returned status %s" % (
-                            self.__class__.__name__, r.status_code))
-                elif r.status_code in self.status_empty:
-                    yield {}
-                    return
-                elif r.status_code in self.status_internal_error:
-                    timeout_counter += 1
-                    if timeout_counter > self.retries_on_timeout:
-                        raise requests.exceptions.Timeout("VCS is down")
-                    time.sleep(2**timeout_counter)
-                    continue  # i.e. try again
-                elif r.status_code in self.status_too_many_requests:
-                    timeout_counter += 1
-                    if timeout_counter > self.retries_on_timeout:
-                        raise requests.exceptions.Timeout(
-                            "Too many requests from the same IP. "
-                            "Are you abusing the API?")
-                    time.sleep(2**timeout_counter)
-                    continue
-
-                r.raise_for_status()
-                res = self.extract_result(r, paginate)
-                if paginate:
-                    for item in res:
-                        yield item
-                    if not res or not self.has_next_page(r):
-                        return
-                    else:
-                        params["page"] += 1
-                        continue
-                else:
-                    yield res
-                    return
+                yield token
 
             next_res = min(token.when(url) for token in self.tokens)
             sleep = next_res and int(next_res - time.time()) + 1
@@ -252,6 +327,87 @@ class VCSAPI(object):
                     datetime.now().strftime("%H:%M"), *divmod(sleep, 60))
                 time.sleep(sleep)
                 self.logger.info(".. resumed")
+
+    def request(self, url, method='get', data=None, paginate=False, **params):
+        """ Make an API request, taking care of pagination
+
+        Args:
+            url (str): request URL
+            method (str): HTTP method type
+            data (str): API request payload (for POST requests)
+            paginate (bool): flag to take care of pagination
+
+        Generates:
+            object: parsed object, API-specific
+        """
+        if paginate:
+            params.update(self.init_pagination())
+
+        while True:
+            r = self._request(url, method, data, **params)
+            if r.status_code in self.status_empty:
+                return
+
+            res = self.extract_result(r)
+            if paginate:
+                for item in res:
+                    yield item
+                if not res or not self._has_next_page(r):
+                    return
+                else:
+                    params["page"] += 1
+                    continue
+            else:
+                yield res
+                return
+
+    def _request(self, url, method='get', data=None, **params):
+        """ Make
+        Args:
+            url (str): request URL
+            method (str): HTTP method type
+            data (str): API request payload (for POST requests)
+
+        Return:
+            requests.Response: raw HTTP response
+        """
+        timeout_counter = 0
+        for token in self.iterate_tokens(url):
+            try:
+                r = token(url, method=method, data=data, **params)
+            except TokenNotReady:
+                continue
+            except requests.exceptions.RequestException:
+                # starting early November, GitHub fails to establish
+                # a connection once in a while (bad status line).
+                # To account for more general issues like this,
+                # TimeoutException was replaced with RequestException
+                timeout_counter += 1
+                if timeout_counter > self.retries_on_timeout:
+                    raise
+                continue  # i.e. try again
+
+            if r.status_code in self.status_not_found:  # API v3 only
+                raise RepoDoesNotExist(
+                    "%s API returned status %s at %s" % (
+                        self.__class__.__name__, r.status_code, url))
+            elif r.status_code in self.status_internal_error:
+                timeout_counter += 1
+                if timeout_counter > self.retries_on_timeout:
+                    raise requests.exceptions.Timeout("VCS is down")
+                time.sleep(2**timeout_counter)
+                continue  # i.e. try again
+            elif r.status_code in self.status_too_many_requests:
+                timeout_counter += 1
+                if timeout_counter > self.retries_on_timeout:
+                    raise requests.exceptions.Timeout(
+                        "Too many requests from the same IP. "
+                        "Are you abusing the API?")
+                time.sleep(1 << (timeout_counter+1))
+                continue
+
+            r.raise_for_status()
+            return r
 
     def all_users(self):
         # type: () -> Iterable[dict]
@@ -327,110 +483,3 @@ class VCSAPI(object):
         # type: (str) -> bool
         """ """
         raise NotImplementedError
-
-    @staticmethod
-    def canonical_url(repo_slug):
-        # type: (str) -> str
-        """ """
-        raise NotImplementedError
-
-
-class APIToken(object):
-    """ An abstract container for an API token
-    """
-    api_url = None  # API endpoint
-
-    token = None  # str token
-    timeout = None  # number of seconds before throwing IOError
-    _headers = {}  # request headers to use
-    api_classes = ('core',)  # supported API classes (e.g. core, search etc)
-    limits = None  # rate limits for API classes
-    session = None
-
-    def __init__(self, token=None, timeout=None):
-        self.token = token
-        self.timeout = timeout
-        self.limits = {api_class: {
-            'limit': None,
-            'remaining': None,
-            'reset_time': None
-        } for api_class in self.api_classes}
-        self.session = requests.Session()
-
-    @property
-    def user(self):
-        """ Get user info of the token owner """
-        raise NotImplementedError
-
-    def _update_limits(self, response, url):
-        raise NotImplementedError
-
-    def check_limits(self):
-        """ Get information about remaining limits on the token.
-
-        Usually this information present in response headers and updated
-        automatically (see _update_limits()). This method is intended to
-        FORCE to renew this info.
-
-        Some APIs have multiple classes of limits, so it should return a list
-        of dictionaries
-        { <api_class>: {
-                'remaining': remaining number of requests until reset,
-                'limit': overall limit,
-                'reset_time': unix_timestamp
-            },
-            ...
-         }
-        """
-        raise NotImplementedError
-
-    @staticmethod
-    def api_class(url):
-        # type: (str) -> str
-        return 'core'
-
-    def when(self, url):
-        # type: (str) -> int
-        """Check when the specified URL become accessible without blocking
-
-        Returns: unix timestamp
-        """
-        raise NotImplementedError
-
-    def ready(self, url):
-        """ Check if this url can be called without blocking """
-        t = self.when(url)
-        return not t or t <= time.time()
-
-    def __call__(self, url, method='get', data=None, **params):
-        """ Make an API request """
-        # TODO: use coroutines, perhaps Tornado (as PY2/3 compatible)
-
-        if not self.ready(url):
-            raise TokenNotReady
-
-        r = self.session.request(
-            method, self.api_url + url, params=params, data=data,
-            headers=self._headers,  timeout=self.timeout)
-
-        self._update_limits(r, url)
-
-        return r
-
-
-class DummyAPIToken(APIToken):
-    """ A dummy token class that does nothing """
-
-    user = 'Anonymous'
-
-    def check_limits(self):
-        return self.limits
-
-    def ready(self, url):
-        return True
-
-    def when(self, url):
-        return None
-
-    def _update_limits(self, response, url):
-        pass

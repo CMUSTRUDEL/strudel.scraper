@@ -1,6 +1,5 @@
 
-from .base import *
-from .generic import *
+from .github import *
 
 __version__ = '0.4.0'
 __author__ = "Marat (@cmu.edu)"

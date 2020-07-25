@@ -38,7 +38,9 @@ setup(
     ],
     platforms=["Linux", "Solaris", "Mac OS-X", "Unix", "Windows"],
     python_requires='>2.6, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4',
-    scripts=[os.path.join('scripts', 'check_gh_limits.py')],
+    entry_points={
+        'console_scripts': ["check_gh_limits = stscraper.github:print_limits"]
+    },
     packages=[package],
     url='https://github.com/cmustrudel/strudel.scraper',
     install_requires=requirements,

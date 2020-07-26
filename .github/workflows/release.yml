@@ -60,5 +60,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
-          git commit -m "github pages"
-          git push
+          # git commit will fail if there are no changes, thus ignore exit code
+          git commit -m "github pages" -a && git push || true

@@ -1,0 +1,597 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>stscraper.github &#8212; strudel.scraper 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for stscraper.github</h1><div class="highlight"><pre>
+<span></span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">absolute_import</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">.base</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">import</span> <span class="nn">stutils</span>
+
+
+<span class="k">class</span> <span class="nc">GitHubAPIToken</span><span class="p">(</span><span class="n">APIToken</span><span class="p">):</span>
+    <span class="n">api_url</span> <span class="o">=</span> <span class="s1">&#39;https://api.github.com/&#39;</span>
+    <span class="n">api_classes</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;core&#39;</span><span class="p">,</span> <span class="s1">&#39;search&#39;</span><span class="p">)</span>
+
+    <span class="n">_user</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># cache user</span>
+    <span class="c1"># dictionaries are mutable. Don&#39;t put default headers dict here</span>
+    <span class="c1"># or it will be shared by all class instances</span>
+    <span class="n">_headers</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">GitHubAPIToken</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span>
+        <span class="c1"># mercy-preview: repo topics</span>
+        <span class="c1"># squirrel-girl-preview: issue reactions</span>
+        <span class="c1"># starfox-preview: issue events</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_headers</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;Accept&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.github.mercy-preview+json,&#39;</span>
+                      <span class="s1">&#39;application/vnd.github.squirrel-girl-preview,&#39;</span>
+                      <span class="s1">&#39;application/vnd.github.starfox-preview+json&#39;</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">token</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token</span> <span class="o">=</span> <span class="n">token</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_headers</span><span class="p">[</span><span class="s1">&#39;Authorization&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;token &#39;</span> <span class="o">+</span> <span class="n">token</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">TokenNotReady</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;login&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">check_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># regular limits will be updated automatically upon request</span>
+        <span class="c1"># we only need to take care about search limit</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">stats</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="s1">&#39;rate_limit&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s1">&#39;resources&#39;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="n">TokenNotReady</span><span class="p">:</span>
+            <span class="n">stats</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="bp">cls</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">api_classes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="bp">cls</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_map</span><span class="p">({</span>
+                <span class="s1">&#39;remaining&#39;</span><span class="p">:</span> <span class="s1">&#39;remaining&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;reset&#39;</span><span class="p">:</span> <span class="s1">&#39;reset&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;limit&#39;</span><span class="p">:</span> <span class="s1">&#39;limit&#39;</span><span class="p">,</span>
+            <span class="p">},</span> <span class="n">stats</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="p">{}))</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">api_class</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;search&#39;</span> <span class="k">if</span> <span class="n">url</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;search&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="s1">&#39;core&#39;</span>
+
+    <span class="k">def</span> <span class="nf">legit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Check if this is a legit key&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="s1">&#39;core&#39;</span><span class="p">][</span><span class="s1">&#39;limit&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">check_limits</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="s1">&#39;core&#39;</span><span class="p">][</span><span class="s1">&#39;limit&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">100</span>
+
+    <span class="k">def</span> <span class="nf">when</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">api_class</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s1">&#39;remaining&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s1">&#39;reset&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_update_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;X-RateLimit-Remaining&#39;</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">:</span>
+            <span class="n">remaining</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s1">&#39;X-RateLimit-Remaining&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">api_class</span><span class="p">(</span><span class="n">url</span><span class="p">)]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;remaining&#39;</span><span class="p">:</span> <span class="n">remaining</span><span class="p">,</span>
+                <span class="s1">&#39;reset&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s1">&#39;X-RateLimit-Reset&#39;</span><span class="p">]),</span>
+                <span class="s1">&#39;limit&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s1">&#39;X-RateLimit-Limit&#39;</span><span class="p">])</span>
+            <span class="p">}</span>
+
+            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">403</span> <span class="ow">and</span> <span class="n">remaining</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">TokenNotReady</span>
+
+
+<div class="viewcode-block" id="GitHubAPI"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI">[docs]</a><span class="k">class</span> <span class="nc">GitHubAPI</span><span class="p">(</span><span class="n">VCSAPI</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; This is a convenience class to pool GitHub v3 API keys and update their</span>
+<span class="sd">    limits after every request. Actual work is done by outside classes, such</span>
+<span class="sd">    as _IssueIterator and _CommitIterator</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">token_class</span> <span class="o">=</span> <span class="n">GitHubAPIToken</span>
+    <span class="n">base_url</span> <span class="o">=</span> <span class="s1">&#39;https://github.com&#39;</span>
+    <span class="n">status_too_many_requests</span> <span class="o">=</span> <span class="p">(</span><span class="mi">403</span><span class="p">,)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tokens</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">):</span>
+        <span class="c1"># Where to look for tokens:</span>
+        <span class="c1"># strudel config variables</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tokens</span><span class="p">:</span>
+            <span class="n">stconfig_tokens</span> <span class="o">=</span> <span class="n">stutils</span><span class="o">.</span><span class="n">get_config</span><span class="p">(</span><span class="s1">&#39;GITHUB_API_TOKENS&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">stconfig_tokens</span><span class="p">:</span>
+                <span class="n">tokens</span> <span class="o">=</span> <span class="p">[</span><span class="n">token</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                          <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">stconfig_tokens</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)</span>
+                          <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">token</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="o">==</span> <span class="mi">40</span><span class="p">]</span>
+
+        <span class="c1"># hub configuration: https://hub.github.com/hub.1.html</span>
+        <span class="c1"># also, used by github actions</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tokens</span><span class="p">:</span>
+            <span class="n">token</span> <span class="o">=</span> <span class="n">stutils</span><span class="o">.</span><span class="n">get_config</span><span class="p">(</span><span class="s1">&#39;GITHUB_TOKEN&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">token</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;~/.config/hub&quot;</span><span class="p">):</span>
+                <span class="n">token</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;~/.config/hub&quot;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">token</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">token</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="o">==</span> <span class="mi">40</span><span class="p">:</span>
+                <span class="n">tokens</span> <span class="o">=</span> <span class="p">[</span><span class="n">token</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tokens</span><span class="p">:</span>
+            <span class="n">tokens</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;No tokens provided. GitHub API will be limited to &quot;</span>
+                          <span class="s2">&quot;60 requests an hour&quot;</span><span class="p">,</span> <span class="ne">Warning</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">(</span><span class="n">GitHubAPI</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">tokens</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_has_next_page</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">rel</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Link&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">rel</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;;&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;rel=&quot;next&quot;&#39;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># ===================================</span>
+    <span class="c1">#           API methods</span>
+    <span class="c1"># ===================================</span>
+<div class="viewcode-block" id="GitHubAPI.all_users"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.all_users">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;users&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">all_users</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get all GitHub users&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/users/#get-all-users</span>
+        <span class="k">return</span> <span class="p">()</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.all_repos"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.all_repos">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repositories&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">all_repos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get all GitHub repositories&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/repos/#list-all-public-repositories</span>
+        <span class="k">return</span> <span class="p">()</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_info"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_info">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get repository info&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/repos/#get</span>
+        <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_issues"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_issues">[docs]</a>    <span class="nd">@api_filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">issue</span><span class="p">:</span> <span class="s1">&#39;pull_request&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">issue</span><span class="p">)</span>
+    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/issues&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_issues</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get repository issues (not including pull requests)&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/issues/#list-issues-for-a-repository</span>
+        <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_issue_comments"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_issue_comments">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/issues/comments&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_issue_comments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get all comments in all issues and pull requests,</span>
+<span class="sd">        both open and closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository</span>
+        <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_issue_events"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_issue_events">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/issues/events&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_issue_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get all events in all issues and pull requests,</span>
+<span class="sd">        both open and closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/issues/events/#list-events-for-a-repository</span>
+        <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_commits"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_commits">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/commits&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_commits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get all repository commits.</span>
+<span class="sd">        Note that GitHub API might ignore some merge commits&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository</span>
+        <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_pulls"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_pulls">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/pulls&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_pulls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get all repository pull requests.</span>
+<span class="sd">        Unlike the issues API, this method will return information specific for</span>
+<span class="sd">        pull requests, like head SHAs and branch names.&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/pulls/#list-pull-requests</span>
+        <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_topics"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_topics">[docs]</a>    <span class="k">def</span> <span class="nf">repo_topics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get a tuple of repository topics.</span>
+<span class="sd">        Topics are &quot;keywords&quot; assigned by repository owner.</span>
+
+<span class="sd">        &gt;&gt;&gt; GitHubAPI().repo_topics(&#39;pandas-dev/pandas&#39;)</span>
+<span class="sd">        (&#39;data-analysis&#39;, &#39;pandas&#39;, &#39;flexible&#39;, &#39;alignment&#39;, &#39;python&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/topics&#39;</span> <span class="o">%</span> <span class="n">repo_slug</span><span class="p">))</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;names&#39;</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_labels"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_labels">[docs]</a>    <span class="k">def</span> <span class="nf">repo_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get a tuple of repository labels.</span>
+<span class="sd">        Labels are issue tags used by maintainers</span>
+
+<span class="sd">        &gt;&gt;&gt; GitHubAPI().repo_labels(&#39;pandas-dev/pandas&#39;)[:5]</span>
+<span class="sd">        (&#39;2/3 Compat&#39;, &#39;32bit&#39;, &#39;API - Consistency&#39;, &#39;API Design&#39;, &#39;Admin&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">label</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span>
+                     <span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/labels&#39;</span> <span class="o">%</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_contributors"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_contributors">[docs]</a>    <span class="k">def</span> <span class="nf">repo_contributors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get a timeline of up to 100 top project contributors</span>
+
+<span class="sd">        Suggested use:</span>
+
+<span class="sd">        &gt;&gt;&gt; import pandas as pd</span>
+<span class="sd">        &gt;&gt;&gt; df = pd.DataFrame(</span>
+<span class="sd">        ...     GitHubAPI().repo_contributors(repo_slug)).set_index(&#39;user&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; df.columns = pd.to_datetime(df.columns, unit=&#39;s&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; df</span>
+<span class="sd">                  2018-08-19  2018-08-26    ...    2020-07-12  2020-07-19</span>
+<span class="sd">        user                                ...</span>
+<span class="sd">        user2589           3           0    ...             0           0</span>
+<span class="sd">        ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/repos/statistics/#get-all-contributor-commit-activity</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/stats/contributors&#39;</span> <span class="o">%</span> <span class="n">repo_slug</span>
+        <span class="k">for</span> <span class="n">contributor_stats</span> <span class="ow">in</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">url</span><span class="p">)):</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="p">{</span><span class="n">w</span><span class="p">[</span><span class="s1">&#39;w&#39;</span><span class="p">]:</span> <span class="n">w</span><span class="p">[</span><span class="s1">&#39;c&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">contributor_stats</span><span class="p">[</span><span class="s1">&#39;weeks&#39;</span><span class="p">]}</span>
+            <span class="n">record</span><span class="p">[</span><span class="s1">&#39;user&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">contributor_stats</span><span class="p">,</span> <span class="s1">&#39;author&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">record</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.pull_request_commits"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.pull_request_commits">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/pulls/</span><span class="si">%d</span><span class="s1">/commits&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">pull_request_commits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo</span><span class="p">,</span> <span class="n">pr_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get commits in a pull request.</span>
+<span class="sd">        `pr_id` is the visible pull request number, not internal GitHub id.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue</span>
+        <span class="k">return</span> <span class="n">repo</span><span class="p">,</span> <span class="n">pr_id</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.issue_comments"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.issue_comments">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/issues/</span><span class="si">%s</span><span class="s1">/comments&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">issue_comments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo</span><span class="p">,</span> <span class="n">issue_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get comments on an issue or a pull request.</span>
+<span class="sd">        Note that for pull requests this method will return only general</span>
+<span class="sd">        comments to the pull request, but not review comments related to some</span>
+<span class="sd">        code. Use review_comments() to get those instead.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue</span>
+        <span class="k">return</span> <span class="n">repo</span><span class="p">,</span> <span class="n">issue_id</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.review_comments"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.review_comments">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/pulls/</span><span class="si">%s</span><span class="s1">/comments&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">review_comments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo</span><span class="p">,</span> <span class="n">pr_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Get pull request comments related to some code.</span>
+<span class="sd">        This will not return general comments, see `issue_comments()`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/pulls/comments/</span>
+        <span class="k">return</span> <span class="n">repo</span><span class="p">,</span> <span class="n">pr_id</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.user_info"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.user_info">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;users/</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">user_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get user info - name, location, blog etc.&quot;&quot;&quot;</span>
+        <span class="c1"># Docs: https://developer.github.com/v3/users/#response</span>
+        <span class="k">return</span> <span class="n">username</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.user_repos"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.user_repos">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;users/</span><span class="si">%s</span><span class="s1">/repos&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">user_repos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get list of user repositories&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/repos/#list-user-repositories</span>
+        <span class="k">return</span> <span class="n">username</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.user_orgs"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.user_orgs">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;users/</span><span class="si">%s</span><span class="s1">/orgs&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">user_orgs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get user organization membership.</span>
+<span class="sd">        Usually includes only public memberships, but for yourself you get</span>
+<span class="sd">        non-public as well.&quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/orgs/#list-user-organizations</span>
+        <span class="k">return</span> <span class="n">username</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.org_members"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.org_members">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;orgs/</span><span class="si">%s</span><span class="s1">/members&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">org_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">org</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get public organization members.</span>
+<span class="sd">        Note that if you are a member of the organization you&#39;ll get everybody.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># https://developer.github.com/v3/orgs/members/#members-list</span>
+        <span class="k">return</span> <span class="n">org</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.org_repos"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.org_repos">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;orgs/</span><span class="si">%s</span><span class="s1">/repos&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">org_repos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">org</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get organization repositories&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">org</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.issue_events"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.issue_events">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/issues/</span><span class="si">%d</span><span class="s1">/events&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">issue_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo</span><span class="p">,</span> <span class="n">issue_no</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get issue events.</span>
+<span class="sd">        This includes state changes, references, labels etc. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">repo</span><span class="p">,</span> <span class="n">issue_no</span></div>
+
+    <span class="c1"># ===================================</span>
+    <span class="c1">#        Non-API methods</span>
+    <span class="c1"># ===================================</span>
+<div class="viewcode-block" id="GitHubAPI.project_exists"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.project_exists">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">project_exists</span><span class="p">(</span><span class="n">repo_slug</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check if the project exists.</span>
+<span class="sd">        This is a slightly cheaper alternative to getting repository info. It</span>
+<span class="sd">        does not using API keys.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">requests</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="s2">&quot;https://github.com/&quot;</span> <span class="o">+</span> <span class="n">repo_slug</span><span class="p">))</span>
+            <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">RequestException</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">i</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="GitHubAPIv4"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4">[docs]</a><span class="k">class</span> <span class="nc">GitHubAPIv4</span><span class="p">(</span><span class="n">GitHubAPI</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; An interface to GitHub v4 GraphQL API.</span>
+
+<span class="sd">    Due to the nature of graphql API, this class does not provide a specific</span>
+<span class="sd">    set of methods. Instead, you&#39;re expected to write your own queries and this</span>
+<span class="sd">    class will help you with pagination and network timeouts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="GitHubAPIv4.v4"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.v4">[docs]</a>    <span class="k">def</span> <span class="nf">v4</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">object_path</span><span class="o">=</span><span class="p">(),</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Make an API v4 request, taking care of pagination</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            query (str): GraphQL query. If the API request is multipage, it is</span>
+<span class="sd">                expected that the cursor variable name is &quot;cursor&quot;.</span>
+<span class="sd">            object_path (Tuple[str]): json path to objects to iterate, excluding</span>
+<span class="sd">                leading &quot;data&quot; part, and the trailing &quot;nodes&quot; when applicable.</span>
+<span class="sd">                If omitted, will return full &quot;data&quot; content</span>
+<span class="sd">                Example: (&quot;repository&quot;, &quot;issues&quot;)</span>
+<span class="sd">            **params: dictionary of query variables.</span>
+
+<span class="sd">        Yields:</span>
+<span class="sd">            object: parsed object, query-specific</span>
+
+<span class="sd">        This method always returns an iterator, so normally you just throw it</span>
+<span class="sd">        straint into a loop:</span>
+
+<span class="sd">        &gt;&gt;&gt; followers = GitHubAPIv4().v4(&#39;&#39;&#39;</span>
+<span class="sd">        ...     query ($user: String!, $cursor: String) {</span>
+<span class="sd">        ...       user(login: $user) {</span>
+<span class="sd">        ...         followers(first:100, after:$cursor) {</span>
+<span class="sd">        ...           nodes { login }</span>
+<span class="sd">        ...           pageInfo{endCursor, hasNextPage}</span>
+<span class="sd">        ...     }}}&#39;&#39;&#39;, (&quot;user&quot;, &quot;followers&quot;), user=user)</span>
+<span class="sd">        &gt;&gt;&gt; for follower in followers:</span>
+<span class="sd">        ...     pass</span>
+
+<span class="sd">        The method will look for `pageInfo` object in the object path and handle</span>
+<span class="sd">        pagination transparently.</span>
+
+<span class="sd">        However, the method will also return an iterator if the query is</span>
+<span class="sd">        expected to return a single result. In this case, you need to explicitly</span>
+<span class="sd">        get the first record, e.g. by calling `next()` on the result:</span>
+
+<span class="sd">        &gt;&gt;&gt; user_info = next(self.v4(&#39;&#39;&#39;</span>
+<span class="sd">        ...     query ($user: String!) {</span>
+<span class="sd">        ...       user(login:$user) {</span>
+<span class="sd">        ...         login, name, avatarUrl, websiteUrl</span>
+<span class="sd">        ...         company, bio, location, name, twitterUsername, isHireable</span>
+<span class="sd">        ...         createdAt, updatedAt</span>
+<span class="sd">        ...         followers{totalCount}</span>
+<span class="sd">        ...         following {totalCount}</span>
+<span class="sd">        ...       }}&#39;&#39;&#39;, (&#39;user&#39;,), user=user))</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="n">query</span><span class="p">,</span> <span class="s1">&#39;variables&#39;</span><span class="p">:</span> <span class="n">params</span><span class="p">})</span>
+
+            <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s1">&#39;graphql&#39;</span><span class="p">,</span> <span class="s1">&#39;post&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">status_empty</span><span class="p">:</span>
+                <span class="k">return</span>
+
+            <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_result</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s1">&#39;data&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">VCSError</span><span class="p">(</span><span class="s1">&#39;API didn</span><span class="se">\&#39;</span><span class="s1">t return any data:</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span>
+                               <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">))</span>
+
+            <span class="n">objects</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">],</span> <span class="o">*</span><span class="n">object_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">objects</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">VCSError</span><span class="p">(</span><span class="s1">&#39;Invalid object path &quot;</span><span class="si">%s</span><span class="s1">&quot; in:</span><span class="se">\n</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span>
+                               <span class="p">(</span><span class="n">object_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">res</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="s1">&#39;nodes&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">objects</span>
+                <span class="k">return</span>
+            <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">[</span><span class="s1">&#39;nodes&#39;</span><span class="p">]:</span>
+                <span class="k">yield</span> <span class="n">obj</span>
+            <span class="c1"># the result is single page, or there are no more pages</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;hasNextPage&#39;</span><span class="p">):</span>
+                <span class="k">return</span>
+            <span class="n">params</span><span class="p">[</span><span class="s1">&#39;cursor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;endCursor&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="GitHubAPIv4.repo_issues"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.repo_issues">[docs]</a>    <span class="k">def</span> <span class="nf">repo_issues</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">cursor</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">owner</span><span class="p">,</span> <span class="n">repo</span> <span class="o">=</span> <span class="n">repo_slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            query ($owner: String!, $repo: String!, $cursor: String) {</span>
+<span class="s2">                repository(name: $repo, owner: $owner) {</span>
+<span class="s2">                  hasIssuesEnabled</span>
+<span class="s2">                    issues (first: 100, after: $cursor,</span>
+<span class="s2">                      orderBy: {field:CREATED_AT, direction: ASC}) {</span>
+<span class="s2">                        nodes {author </span><span class="si">{login}</span><span class="s2">, closed, createdAt,</span>
+<span class="s2">                               updatedAt, number, title}</span>
+<span class="s2">                        pageInfo {endCursor, hasNextPage}</span>
+<span class="s2">                }}</span>
+<span class="s2">            }&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;issues&#39;</span><span class="p">),</span> <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">user_followers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            query ($user: String!, $cursor: String) { </span>
+<span class="s2">              user(login: $user) {</span>
+<span class="s2">                followers(first:100, after:$cursor) {</span>
+<span class="s2">                  nodes { login }</span>
+<span class="s2">                  pageInfo{endCursor, hasNextPage}</span>
+<span class="s2">            }}}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;followers&#39;</span><span class="p">),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+
+<div class="viewcode-block" id="GitHubAPIv4.user_info"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.user_info">[docs]</a>    <span class="k">def</span> <span class="nf">user_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            query ($user: String!) { </span>
+<span class="s2">              user(login:$user) { </span>
+<span class="s2">                login, name, avatarUrl, websiteUrl</span>
+<span class="s2">                company, bio, location, name, twitterUsername, isHireable</span>
+<span class="s2">                # email  # email requires extra scopes from the API key</span>
+<span class="s2">                createdAt, updatedAt</span>
+<span class="s2">                followers</span><span class="si">{totalCount}</span><span class="s2"></span>
+<span class="s2">                following </span><span class="si">{totalCount}</span><span class="s2"></span>
+<span class="s2">              }}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="GitHubAPIv4.repo_commits"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.repo_commits">[docs]</a>    <span class="k">def</span> <span class="nf">repo_commits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="n">owner</span><span class="p">,</span> <span class="n">repo</span> <span class="o">=</span> <span class="n">repo_slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            query ($owner: String!, $repo: String!, $cursor: String) {</span>
+<span class="s2">            repository(name: $repo, owner: $owner) {</span>
+<span class="s2">                defaultBranchRef{ target {</span>
+<span class="s2">                # object(expression: &quot;HEAD&quot;) {</span>
+<span class="s2">                ... on Commit {</span>
+<span class="s2">                    history (first: 100, after: $cursor) {</span>
+<span class="s2">                        nodes {sha:oid, author {name, email, user</span><span class="si">{login}</span><span class="s2">}</span>
+<span class="s2">                               message, committedDate</span>
+<span class="s2">                          # normally there is only 1 parent; max observed is 3</span>
+<span class="s2">                          parents (first:100) {</span>
+<span class="s2">                            nodes {sha:oid}}</span>
+<span class="s2">                        }</span>
+<span class="s2">                        pageInfo {endCursor, hasNextPage}</span>
+<span class="s2">            }}}}}}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;defaultBranchRef&#39;</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">,</span> <span class="s1">&#39;history&#39;</span><span class="p">),</span>
+                       <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span></div></div>
+
+
+<span class="k">def</span> <span class="nf">get_limits</span><span class="p">(</span><span class="n">tokens</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get human-readable rate usage limit.</span>
+
+<span class="sd">    Returns a generator of dictionaries with columns:</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">api</span> <span class="o">=</span> <span class="n">GitHubAPI</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span>
+    <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">token</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">api</span><span class="o">.</span><span class="n">tokens</span><span class="p">):</span>
+        <span class="c1"># if limit is exhausted there is no way to get username</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">user</span> <span class="ow">or</span> <span class="s1">&#39;&lt;unknown</span><span class="si">%d</span><span class="s1">&gt;&#39;</span> <span class="o">%</span> <span class="n">i</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;user&#39;</span><span class="p">:</span> <span class="n">user</span><span class="p">,</span> <span class="s1">&#39;key&#39;</span><span class="p">:</span> <span class="n">token</span><span class="o">.</span><span class="n">token</span><span class="p">}</span>
+        <span class="n">token</span><span class="o">.</span><span class="n">check_limits</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">api_class</span> <span class="ow">in</span> <span class="n">token</span><span class="o">.</span><span class="n">limits</span><span class="p">:</span>
+            <span class="n">next_update</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="n">api_class</span><span class="p">][</span><span class="s1">&#39;reset&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">next_update</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">renew</span> <span class="o">=</span> <span class="s1">&#39;never&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tdiff</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">next_update</span><span class="p">)</span> <span class="o">-</span> <span class="n">now</span>
+                <span class="n">renew</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%d</span><span class="s1">m</span><span class="si">%d</span><span class="s1">s&#39;</span> <span class="o">%</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">tdiff</span><span class="o">.</span><span class="n">seconds</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="n">values</span><span class="p">[</span><span class="n">api_class</span> <span class="o">+</span> <span class="s1">&#39;_renews_in&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">renew</span>
+            <span class="n">values</span><span class="p">[</span><span class="n">api_class</span> <span class="o">+</span> <span class="s1">&#39;_limit&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="n">api_class</span><span class="p">][</span><span class="s1">&#39;limit&#39;</span><span class="p">]</span>
+            <span class="n">values</span><span class="p">[</span><span class="n">api_class</span> <span class="o">+</span> <span class="s1">&#39;_remaining&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="n">api_class</span><span class="p">][</span><span class="s1">&#39;remaining&#39;</span><span class="p">]</span>
+
+        <span class="k">yield</span> <span class="n">values</span>
+
+
+<span class="k">def</span> <span class="nf">print_limits</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Check remaining limits of registered GitHub API keys&quot;&quot;&quot;</span>
+
+    <span class="n">columns</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;core_limit&#39;</span><span class="p">,</span> <span class="s1">&#39;core_remaining&#39;</span><span class="p">,</span> <span class="s1">&#39;core_renews_in&#39;</span><span class="p">,</span>
+               <span class="s1">&#39;search_limit&#39;</span><span class="p">,</span> <span class="s1">&#39;search_remaining&#39;</span><span class="p">,</span> <span class="s1">&#39;search_renews_in&#39;</span><span class="p">,</span>
+               <span class="s1">&#39;key&#39;</span><span class="p">)</span>
+
+    <span class="n">stats</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">get_limits</span><span class="p">())</span>
+
+    <span class="n">lens</span> <span class="o">=</span> <span class="p">{</span><span class="n">column</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="n">column</span><span class="p">])),</span> <span class="nb">len</span><span class="p">(</span><span class="n">column</span><span class="p">))</span>
+                        <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">stats</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">}</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">lens</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">stats</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="n">c</span><span class="p">])</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">lens</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">))</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">strudel.scraper</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Marat (@cmu.edu).
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

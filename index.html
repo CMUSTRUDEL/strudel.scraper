@@ -1,17 +1,18 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>Reference &#8212; strudel.scraper 0.4.0 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference &#8212; strudel.scraper 1.0.0 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
    
@@ -34,9 +35,303 @@
 <h1>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h1>
 <div class="toctree-wrapper compound">
 </div>
-<p><a class="reference internal" href="github.html"><span class="doc">&lt;no title&gt;</span></a>
-<a class="reference internal" href="gitlab.html"><span class="doc">&lt;no title&gt;</span></a>
-<span class="xref std std-doc">BitBucket</span></p>
+<span class="target" id="module-stscraper"></span><p><cite>stscraper</cite> is a Python interface for GitHub API</p>
+<p>Key features:</p>
+<ul class="simple">
+<li><p>utilize multiple API keys to speed up scraping</p></li>
+<li><p>transparently handle pagination and minor network errors</p></li>
+</ul>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --user --upgrade strudel.scraper
+</pre></div>
+</div>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>The main way to use this module is through <a class="reference internal" href="#stscraper.GitHubAPI" title="stscraper.GitHubAPI"><code class="xref py py-class docutils literal notranslate"><span class="pre">GitHubAPI</span></code></a> objects.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">stscraper</span> <span class="k">as</span> <span class="nn">scraper</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="n">gh_api</span> <span class="o">=</span> <span class="n">scraper</span><span class="o">.</span><span class="n">GitHubAPI</span><span class="p">(</span><span class="s2">&quot;token1,token2,...&quot;</span><span class="p">)</span>
+
+<span class="c1"># repo_issues is a generator that can be used</span>
+<span class="c1"># to instantiate a pandas dataframe</span>
+<span class="n">issues</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">gh_api</span><span class="o">.</span><span class="n">repo_issues</span><span class="p">(</span><span class="s1">&#39;cmustrudel/strudel.scraper&#39;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Tokens can be provided either at class instantiation or through an environment
+variable:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># somewhere in ~/.bashrc</span>
+<span class="nb">export</span> <span class="nv">GITHUB_API_TOKENS</span><span class="o">=</span><span class="s1">&#39;comma-separated list of tokens&#39;</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># later, in some Python file:</span>
+<span class="n">gh_api</span> <span class="o">=</span> <span class="n">scraper</span><span class="o">.</span><span class="n">GitHubAPI</span><span class="p">()</span>  <span class="c1"># tokens from the environment var will be used</span>
+</pre></div>
+</div>
+<p>If no keys were passed at class instantiation and <cite>GITLAB_API_TOKENS</cite>
+environment variable is not defined, <cite>stscraper</cite> will also check <cite>GITHUB_TOKEN</cite>
+environment variable. This variable is created by GitHub actions runner and also
+used by <a class="reference external" href="https://github.com/github/hub)">hub</a> utility.</p>
+</div>
+<div class="section" id="rest-v3-api">
+<h2>REST (v3) API<a class="headerlink" href="#rest-v3-api" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt id="stscraper.GitHubAPI">
+<em class="property">class </em><code class="sig-prename descclassname">stscraper.</code><code class="sig-name descname">GitHubAPI</code><span class="sig-paren">(</span><em class="sig-param"><span class="o">*</span><span class="n">args</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is a convenience class to pool GitHub v3 API keys and update their
+limits after every request. Actual work is done by outside classes, such
+as _IssueIterator and _CommitIterator</p>
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.all_repos">
+<code class="sig-name descname">all_repos</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.all_repos"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.all_repos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all GitHub repositories</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.all_users">
+<code class="sig-name descname">all_users</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.all_users"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.all_users" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all GitHub users</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.issue_comments">
+<code class="sig-name descname">issue_comments</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo</span></em>, <em class="sig-param"><span class="n">issue_id</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.issue_comments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.issue_comments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get comments on an issue or a pull request.
+Note that for pull requests this method will return only general
+comments to the pull request, but not review comments related to some
+code. Use review_comments() to get those instead.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.issue_events">
+<code class="sig-name descname">issue_events</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo</span></em>, <em class="sig-param"><span class="n">issue_no</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.issue_events"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.issue_events" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get issue events.
+This includes state changes, references, labels etc.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.org_members">
+<code class="sig-name descname">org_members</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">org</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.org_members"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.org_members" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get public organization members.
+Note that if you are a member of the organization you’ll get everybody.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.org_repos">
+<code class="sig-name descname">org_repos</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">org</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.org_repos"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.org_repos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get organization repositories</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.project_exists">
+<em class="property">static </em><code class="sig-name descname">project_exists</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.project_exists"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.project_exists" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check if the project exists.
+This is a slightly cheaper alternative to getting repository info. It
+does not using API keys.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.pull_request_commits">
+<code class="sig-name descname">pull_request_commits</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo</span></em>, <em class="sig-param"><span class="n">pr_id</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.pull_request_commits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.pull_request_commits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get commits in a pull request.
+<cite>pr_id</cite> is the visible pull request number, not internal GitHub id.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_commits">
+<code class="sig-name descname">repo_commits</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_commits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_commits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all repository commits.
+Note that GitHub API might ignore some merge commits</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_contributors">
+<code class="sig-name descname">repo_contributors</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_contributors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_contributors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a timeline of up to 100 top project contributors</p>
+<p>Suggested use:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">GitHubAPI</span><span class="p">()</span><span class="o">.</span><span class="n">repo_contributors</span><span class="p">(</span><span class="n">repo_slug</span><span class="p">))</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;s&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span>
+<span class="go">          2018-08-19  2018-08-26    ...    2020-07-12  2020-07-19</span>
+<span class="go">user                                ...</span>
+<span class="go">user2589           3           0    ...             0           0</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_info">
+<code class="sig-name descname">repo_info</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get repository info</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_issue_comments">
+<code class="sig-name descname">repo_issue_comments</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_issue_comments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_issue_comments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all comments in all issues and pull requests,
+both open and closed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_issue_events">
+<code class="sig-name descname">repo_issue_events</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_issue_events"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_issue_events" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all events in all issues and pull requests,
+both open and closed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_issues">
+<code class="sig-name descname">repo_issues</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_issues"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_issues" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get repository issues (not including pull requests)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_labels">
+<code class="sig-name descname">repo_labels</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_labels"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_labels" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a tuple of repository labels.
+Labels are issue tags used by maintainers</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">GitHubAPI</span><span class="p">()</span><span class="o">.</span><span class="n">repo_labels</span><span class="p">(</span><span class="s1">&#39;pandas-dev/pandas&#39;</span><span class="p">)[:</span><span class="mi">5</span><span class="p">]</span>
+<span class="go">(&#39;2/3 Compat&#39;, &#39;32bit&#39;, &#39;API - Consistency&#39;, &#39;API Design&#39;, &#39;Admin&#39;)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_pulls">
+<code class="sig-name descname">repo_pulls</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_pulls"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_pulls" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all repository pull requests.
+Unlike the issues API, this method will return information specific for
+pull requests, like head SHAs and branch names.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.repo_topics">
+<code class="sig-name descname">repo_topics</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.repo_topics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.repo_topics" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a tuple of repository topics.
+Topics are “keywords” assigned by repository owner.</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">GitHubAPI</span><span class="p">()</span><span class="o">.</span><span class="n">repo_topics</span><span class="p">(</span><span class="s1">&#39;pandas-dev/pandas&#39;</span><span class="p">)</span>
+<span class="go">(&#39;data-analysis&#39;, &#39;pandas&#39;, &#39;flexible&#39;, &#39;alignment&#39;, &#39;python&#39;)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.review_comments">
+<code class="sig-name descname">review_comments</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo</span></em>, <em class="sig-param"><span class="n">pr_id</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.review_comments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.review_comments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get pull request comments related to some code.
+This will not return general comments, see <cite>issue_comments()</cite></p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.user_info">
+<code class="sig-name descname">user_info</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">username</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.user_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.user_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get user info - name, location, blog etc.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.user_orgs">
+<code class="sig-name descname">user_orgs</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">username</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.user_orgs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.user_orgs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get user organization membership.
+Usually includes only public memberships, but for yourself you get
+non-public as well.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPI.user_repos">
+<code class="sig-name descname">user_repos</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">username</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPI.user_repos"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPI.user_repos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get list of user repositories</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="graphql-v4-api">
+<h2>GraphQL (v4) API<a class="headerlink" href="#graphql-v4-api" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt id="stscraper.GitHubAPIv4">
+<em class="property">class </em><code class="sig-prename descclassname">stscraper.</code><code class="sig-name descname">GitHubAPIv4</code><span class="sig-paren">(</span><em class="sig-param"><span class="o">*</span><span class="n">args</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4" title="Permalink to this definition">¶</a></dt>
+<dd><p>An interface to GitHub v4 GraphQL API.</p>
+<p>Due to the nature of graphql API, this class does not provide a specific
+set of methods. Instead, you’re expected to write your own queries and this
+class will help you with pagination and network timeouts.</p>
+<dl class="py method">
+<dt id="stscraper.GitHubAPIv4.repo_commits">
+<code class="sig-name descname">repo_commits</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.repo_commits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.repo_commits" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get all repository commits.
+Note that GitHub API might ignore some merge commits</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPIv4.repo_issues">
+<code class="sig-name descname">repo_issues</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em>, <em class="sig-param"><span class="n">cursor</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.repo_issues"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.repo_issues" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get repository issues (not including pull requests)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPIv4.user_info">
+<code class="sig-name descname">user_info</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">user</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.user_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.user_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get user info - name, location, blog etc.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="stscraper.GitHubAPIv4.v4">
+<code class="sig-name descname">v4</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">query</span></em>, <em class="sig-param"><span class="n">object_path</span><span class="o">=</span><span class="default_value">()</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">params</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.v4"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.v4" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make an API v4 request, taking care of pagination</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>str</em>) – GraphQL query. If the API request is multipage, it is
+expected that the cursor variable name is “cursor”.</p></li>
+<li><p><strong>object_path</strong> (<em>Tuple</em><em>[</em><em>str</em><em>]</em>) – json path to objects to iterate, excluding
+leading “data” part, and the trailing “nodes” when applicable.
+If omitted, will return full “data” content
+Example: (“repository”, “issues”)</p></li>
+<li><p><strong>**params</strong> – dictionary of query variables.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Yields</dt>
+<dd class="field-even"><p><em>object</em> – parsed object, query-specific</p>
+</dd>
+</dl>
+<p>This method always returns an iterator, so normally you just throw it
+straint into a loop:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">followers</span> <span class="o">=</span> <span class="n">GitHubAPIv4</span><span class="p">()</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="gp">... </span><span class="s1">    query ($user: String!, $cursor: String) {</span>
+<span class="gp">... </span><span class="s1">      user(login: $user) {</span>
+<span class="gp">... </span><span class="s1">        followers(first:100, after:$cursor) {</span>
+<span class="gp">... </span><span class="s1">          nodes { login }</span>
+<span class="gp">... </span><span class="s1">          pageInfo{endCursor, hasNextPage}</span>
+<span class="gp">... </span><span class="s1">    }}}&#39;&#39;&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;followers&quot;</span><span class="p">),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">follower</span> <span class="ow">in</span> <span class="n">followers</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+</pre></div>
+</div>
+<p>The method will look for <cite>pageInfo</cite> object in the object path and handle
+pagination transparently.</p>
+<p>However, the method will also return an iterator if the query is
+expected to return a single result. In this case, you need to explicitly
+get the first record, e.g. by calling <cite>next()</cite> on the result:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">user_info</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="gp">... </span><span class="s1">    query ($user: String!) {</span>
+<span class="gp">... </span><span class="s1">      user(login:$user) {</span>
+<span class="gp">... </span><span class="s1">        login, name, avatarUrl, websiteUrl</span>
+<span class="gp">... </span><span class="s1">        company, bio, location, name, twitterUsername, isHireable</span>
+<span class="gp">... </span><span class="s1">        createdAt, updatedAt</span>
+<span class="gp">... </span><span class="s1">        followers</span><span class="si">{totalCount}</span><span class="s1"></span>
+<span class="gp">... </span><span class="s1">        following </span><span class="si">{totalCount}</span><span class="s1"></span>
+<span class="gp">... </span><span class="s1">      }}&#39;&#39;&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</div>
 </div>
 
 
@@ -73,7 +368,7 @@
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
 
 
 
@@ -87,10 +382,10 @@
       <div class="clearer"></div>
     </div>
     <div class="footer">
-      &copy;2019, Marat (@cmu.edu).
+      &copy;2020, Marat (@cmu.edu).
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.1</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

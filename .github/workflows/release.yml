@@ -39,7 +39,9 @@ jobs:
       - name: Build pages with sphinx
         run: |
           python3 -m pip install --upgrade pip setuptools
-          pip3 install sphinx sphinx-autobuild
+          # basically, make install_dev but explicitly use pip3
+          pip3 install typing sphinx sphinx-autobuild
+          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
           export PATH=~/.local/bin:$PATH
           sphinx-build -M html "docs" "docs/build"
 

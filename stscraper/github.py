@@ -340,7 +340,7 @@ class GitHubAPIv4(GitHubAPI):
             object: parsed object, query-specific
 
         This method always returns an iterator, so normally you just throw it
-        straint into a loop:
+        straight into a loop:
 
         >>> followers = GitHubAPIv4().v4('''
         ...     query ($user: String!, $cursor: String) {

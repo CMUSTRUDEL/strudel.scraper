@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>stscraper.github &#8212; strudel.scraper 1.0.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
@@ -267,7 +267,7 @@
         <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/stats/contributors&#39;</span> <span class="o">%</span> <span class="n">repo_slug</span>
         <span class="k">for</span> <span class="n">contributor_stats</span> <span class="ow">in</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">url</span><span class="p">)):</span>
             <span class="n">record</span> <span class="o">=</span> <span class="p">{</span><span class="n">w</span><span class="p">[</span><span class="s1">&#39;w&#39;</span><span class="p">]:</span> <span class="n">w</span><span class="p">[</span><span class="s1">&#39;c&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">contributor_stats</span><span class="p">[</span><span class="s1">&#39;weeks&#39;</span><span class="p">]}</span>
-            <span class="n">record</span><span class="p">[</span><span class="s1">&#39;user&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">contributor_stats</span><span class="p">,</span> <span class="s1">&#39;author&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">)</span>
+            <span class="n">record</span><span class="p">[</span><span class="s1">&#39;user&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">contributor_stats</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;author&#39;</span><span class="p">,</span> <span class="s1">&#39;login&#39;</span><span class="p">))</span>
             <span class="k">yield</span> <span class="n">record</span></div>
 
 <div class="viewcode-block" id="GitHubAPI.pull_request_commits"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.pull_request_commits">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/pulls/</span><span class="si">%d</span><span class="s1">/commits&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
@@ -374,7 +374,7 @@
 <span class="sd">            object: parsed object, query-specific</span>
 
 <span class="sd">        This method always returns an iterator, so normally you just throw it</span>
-<span class="sd">        straint into a loop:</span>
+<span class="sd">        straight into a loop:</span>
 
 <span class="sd">        &gt;&gt;&gt; followers = GitHubAPIv4().v4(&#39;&#39;&#39;</span>
 <span class="sd">        ...     query ($user: String!, $cursor: String) {</span>
@@ -416,20 +416,28 @@
             <span class="k">if</span> <span class="s1">&#39;data&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">VCSError</span><span class="p">(</span><span class="s1">&#39;API didn</span><span class="se">\&#39;</span><span class="s1">t return any data:</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span>
                                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">))</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">]</span>
 
-            <span class="n">objects</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">],</span> <span class="o">*</span><span class="n">object_path</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">objects</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">objects</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">object_path</span><span class="p">,</span> <span class="n">raise_on_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">VCSError</span><span class="p">(</span><span class="s1">&#39;Invalid object path &quot;</span><span class="si">%s</span><span class="s1">&quot; in:</span><span class="se">\n</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span>
-                               <span class="p">(</span><span class="n">object_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">res</span><span class="p">)))</span>
-            <span class="k">if</span> <span class="s1">&#39;nodes&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">:</span>
+                               <span class="p">(</span><span class="n">object_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
+
+            <span class="n">has_next_page</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;hasNextPage&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;hasNextPage&#39;</span><span class="p">)):</span>
                 <span class="k">yield</span> <span class="n">objects</span>
                 <span class="k">return</span>
-            <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">[</span><span class="s1">&#39;nodes&#39;</span><span class="p">]:</span>
+            <span class="c1"># This is due to inconsistency in graphql API.</span>
+            <span class="c1"># In most cases, requests returning lists of objects put them in</span>
+            <span class="c1"># &#39;nodes&#39;, but in few legacy methods they use &#39;edges&#39;</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;nodes&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;edges&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">nodes</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">obj</span>
             <span class="c1"># the result is single page, or there are no more pages</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;hasNextPage&#39;</span><span class="p">):</span>
-                <span class="k">return</span>
-            <span class="n">params</span><span class="p">[</span><span class="s1">&#39;cursor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;endCursor&#39;</span><span class="p">)</span></div>
+            <span class="n">params</span><span class="p">[</span><span class="s1">&#39;cursor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;endCursor&#39;</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="GitHubAPIv4.repo_issues"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.repo_issues">[docs]</a>    <span class="k">def</span> <span class="nf">repo_issues</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">cursor</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">owner</span><span class="p">,</span> <span class="n">repo</span> <span class="o">=</span> <span class="n">repo_slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
@@ -585,7 +593,7 @@
       &copy;2020, Marat (@cmu.edu).
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>

@@ -233,7 +233,7 @@ class GitHubAPI(VCSAPI):
         url = 'repos/%s/stats/contributors' % repo_slug
         for contributor_stats in next(self.request(url)):
             record = {w['w']: w['c'] for w in contributor_stats['weeks']}
-            record['user'] = json_path(contributor_stats, 'author', 'login')
+            record['user'] = json_path(contributor_stats, ('author', 'login'))
             yield record
 
     @api('repos/%s/pulls/%d/commits', paginate=True, state='all')
@@ -382,20 +382,28 @@ class GitHubAPIv4(GitHubAPI):
             if 'data' not in res:
                 raise VCSError('API didn\'t return any data:\n' +
                                json.dumps(res, indent=4))
+            data = res['data']
 
-            objects = json_path(res['data'], *object_path)
-            if objects is None:
+            try:
+                objects = json_path(data, object_path, raise_on_missing=True)
+            except IndexError:
                 raise VCSError('Invalid object path "%s" in:\n %s' %
-                               (object_path, json.dumps(res)))
-            if 'nodes' not in objects:
+                               (object_path, json.dumps(data)))
+
+            has_next_page = json_path(objects, ('pageInfo', 'hasNextPage'))
+            if not json_path(objects, ('pageInfo', 'hasNextPage')):
                 yield objects
                 return
-            for obj in objects['nodes']:
+            # This is due to inconsistency in graphql API.
+            # In most cases, requests returning lists of objects put them in
+            # 'nodes', but in few legacy methods they use 'edges'
+            nodes = objects.get('nodes') or objects.get('edges')
+            if not nodes:
+                break
+            for obj in nodes:
                 yield obj
             # the result is single page, or there are no more pages
-            if not json_path(objects, 'pageInfo', 'hasNextPage'):
-                return
-            params['cursor'] = json_path(objects, 'pageInfo', 'endCursor')
+            params['cursor'] = json_path(objects, ('pageInfo', 'endCursor'))
 
     def repo_issues(self, repo_slug, cursor=None):
         owner, repo = repo_slug.split('/')

@@ -390,20 +390,25 @@ class GitHubAPIv4(GitHubAPI):
                 raise VCSError('Invalid object path "%s" in:\n %s' %
                                (object_path, json.dumps(data)))
 
-            has_next_page = json_path(objects, ('pageInfo', 'hasNextPage'))
-            if not json_path(objects, ('pageInfo', 'hasNextPage')):
+            page_info = json_path(objects, ('pageInfo',))
+            if page_info is None:
                 yield objects
                 return
             # This is due to inconsistency in graphql API.
             # In most cases, requests returning lists of objects put them in
             # 'nodes', but in few legacy methods they use 'edges'
             nodes = objects.get('nodes') or objects.get('edges')
-            if not nodes:
-                break
+            if nodes is None:
+                raise EnvironmentError(
+                    'Unexpected result format. Please report an issue:\n'
+                    'https://github.com/CMUSTRUDEL/strudel.scraper/issues/new')
+
             for obj in nodes:
                 yield obj
+            if not json_path(page_info, ('hasNextPage',)):
+                break
             # the result is single page, or there are no more pages
-            params['cursor'] = json_path(objects, ('pageInfo', 'endCursor'))
+            params['cursor'] = json_path(page_info, ('endCursor',))
 
     def repo_issues(self, repo_slug, cursor=None):
         owner, repo = repo_slug.split('/')

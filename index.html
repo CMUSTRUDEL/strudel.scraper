@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Reference &#8212; strudel.scraper 1.0.0 documentation</title>
+    <title>Reference &#8212; strudel.scraper 1.1.0 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -259,76 +259,55 @@ non-public as well.</p>
 <p>Due to the nature of graphql API, this class does not provide a specific
 set of methods. Instead, you’re expected to write your own queries and this
 class will help you with pagination and network timeouts.</p>
-<dl class="py method">
-<dt id="stscraper.GitHubAPIv4.repo_commits">
-<code class="sig-name descname">repo_commits</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.repo_commits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.repo_commits" title="Permalink to this definition">¶</a></dt>
-<dd><p>Get all repository commits.
-Note that GitHub API might ignore some merge commits</p>
-</dd></dl>
-
-<dl class="py method">
-<dt id="stscraper.GitHubAPIv4.repo_issues">
-<code class="sig-name descname">repo_issues</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">repo_slug</span></em>, <em class="sig-param"><span class="n">cursor</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.repo_issues"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.repo_issues" title="Permalink to this definition">¶</a></dt>
-<dd><p>Get repository issues (not including pull requests)</p>
-</dd></dl>
-
-<dl class="py method">
-<dt id="stscraper.GitHubAPIv4.user_info">
-<code class="sig-name descname">user_info</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">user</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.user_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.user_info" title="Permalink to this definition">¶</a></dt>
-<dd><p>Get user info - name, location, blog etc.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt id="stscraper.GitHubAPIv4.v4">
-<code class="sig-name descname">v4</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">query</span></em>, <em class="sig-param"><span class="n">object_path</span><span class="o">=</span><span class="default_value">()</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">params</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/stscraper/github.html#GitHubAPIv4.v4"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#stscraper.GitHubAPIv4.v4" title="Permalink to this definition">¶</a></dt>
-<dd><p>Make an API v4 request, taking care of pagination</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>query</strong> (<em>str</em>) – GraphQL query. If the API request is multipage, it is
-expected that the cursor variable name is “cursor”.</p></li>
-<li><p><strong>object_path</strong> (<em>Tuple</em><em>[</em><em>str</em><em>]</em>) – json path to objects to iterate, excluding
-leading “data” part, and the trailing “nodes” when applicable.
-If omitted, will return full “data” content
-Example: (“repository”, “issues”)</p></li>
-<li><p><strong>**params</strong> – dictionary of query variables.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Yields</dt>
-<dd class="field-even"><p><em>object</em> – parsed object, query-specific</p>
-</dd>
-</dl>
-<p>This method always returns an iterator, so normally you just throw it
-straight into a loop:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">followers</span> <span class="o">=</span> <span class="n">GitHubAPIv4</span><span class="p">()</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;</span>
-<span class="gp">... </span><span class="s1">    query ($user: String!, $cursor: String) {</span>
+<p>Basic usage:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">api</span> <span class="o">=</span> <span class="n">GitHubAPIv4</span><span class="p">(</span><span class="s1">&#39;github_api_tokens&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">api</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;query ($user: String!) {</span>
+<span class="gp">... </span><span class="s1">      user(login:$user) {</span>
+<span class="gp">... </span><span class="s1">        login, name</span>
+<span class="gp">... </span><span class="s1">      }}&#39;&#39;&#39;</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s1">&#39;user2589&#39;</span><span class="p">)</span>
+<span class="go">{&#39;login&#39;: &#39;user2589&#39;, &#39;name&#39;: None}</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">list</span><span class="p">(</span><span class="n">api</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;query ($user: String!, $cursor: String) {</span>
 <span class="gp">... </span><span class="s1">      user(login: $user) {</span>
 <span class="gp">... </span><span class="s1">        followers(first:100, after:$cursor) {</span>
 <span class="gp">... </span><span class="s1">          nodes { login }</span>
 <span class="gp">... </span><span class="s1">          pageInfo{endCursor, hasNextPage}</span>
-<span class="gp">... </span><span class="s1">    }}}&#39;&#39;&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;followers&quot;</span><span class="p">),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">follower</span> <span class="ow">in</span> <span class="n">followers</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">... </span><span class="s1">    }}}&#39;&#39;&#39;</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s1">&#39;user2589&#39;</span><span class="p">))</span>
+<span class="go">[{&#39;login&#39;: &#39;ArefMq&#39;},</span>
+<span class="go"> # ... more users</span>
+<span class="go"> {&#39;login&#39;: &#39;neoascetic&#39;}]</span>
 </pre></div>
 </div>
-<p>The method will look for <cite>pageInfo</cite> object in the object path and handle
-pagination transparently.</p>
-<p>However, the method will also return an iterator if the query is
-expected to return a single result. In this case, you need to explicitly
-get the first record, e.g. by calling <cite>next()</cite> on the result:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">user_info</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;</span>
-<span class="gp">... </span><span class="s1">    query ($user: String!) {</span>
-<span class="gp">... </span><span class="s1">      user(login:$user) {</span>
-<span class="gp">... </span><span class="s1">        login, name, avatarUrl, websiteUrl</span>
-<span class="gp">... </span><span class="s1">        company, bio, location, name, twitterUsername, isHireable</span>
-<span class="gp">... </span><span class="s1">        createdAt, updatedAt</span>
-<span class="gp">... </span><span class="s1">        followers</span><span class="si">{totalCount}</span><span class="s1"></span>
-<span class="gp">... </span><span class="s1">        following </span><span class="si">{totalCount}</span><span class="s1"></span>
-<span class="gp">... </span><span class="s1">      }}&#39;&#39;&#39;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">))</span>
+<p>In the first case, it will return a dictionary of user attributes.
+In the second case, it will return a generator of repository issue objects,
+handling the pagination transparently.</p>
+<p>It looks a little bit like magic, but it is not. Here is how it works:</p>
+<ul>
+<li><dl>
+<dt>first, it will parse the query and try to figure out the first object that</dt><dd><p>has multiple fields; in the first query, it is <cite>user</cite>. In the second,
+it is <cite>user.followers</cite>.
+The query parser is pretty naive, and is expected to fail on non-trivial
+queries. In this case, you will need to explicitly tell what object you
+want to retrieve. In the example below, we explicitly tell scraper the
+path to the return object in the second positional argument:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">api</span><span class="p">(</span><span class="s1">&#39;...some query..&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;defaultBranchRef&#39;</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">,</span> <span class="s1">&#39;history&#39;</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">owner</span><span class="o">=</span><span class="s1">&#39;CMUSTRUDEL&#39;</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="s1">&#39;strudel.scraper&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-</dd></dl>
-
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>then, it will check if there is a <cite>pageInfo</cite> object in this object. If it</dt><dd><p>is not, it will simply return the content of this object; this is what
+happened with the first query. If there IS a pagination object, it will
+indicate we need pagination, and the content of <cite>nodes</cite> or <cite>edges</cite> will
+be returned instead.</p>
+</dd>
+</dl>
+</li>
+</ul>
 </dd></dl>
 
 </div>

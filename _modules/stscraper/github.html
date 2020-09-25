@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stscraper.github &#8212; strudel.scraper 1.0.0 documentation</title>
+    <title>stscraper.github &#8212; strudel.scraper 1.1.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -351,14 +351,76 @@
                 <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">i</span><span class="p">)</span></div></div>
 
 
+<span class="k">def</span> <span class="nf">parse_graphql_path</span><span class="p">(</span><span class="n">query</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Given a query, find object path.</span>
+<span class="sd">    This naive implementation doesn&#39;t account for many quircks in GitHub API.</span>
+<span class="sd">    In some cases, you still need to specify the path manually</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\(.*?\)&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">query</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">&#39; }&#39;</span><span class="p">))</span>
+    <span class="c1"># skip the leading &quot;query(...)&quot; part</span>
+    <span class="n">chunks</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;{&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">:</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;nodes&#39;</span><span class="p">,</span> <span class="s1">&#39;edges&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">chunk</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="s1">&#39; ,}&#39;</span><span class="p">):</span>
+            <span class="k">break</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span>
+
+
 <div class="viewcode-block" id="GitHubAPIv4"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4">[docs]</a><span class="k">class</span> <span class="nc">GitHubAPIv4</span><span class="p">(</span><span class="n">GitHubAPI</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot; An interface to GitHub v4 GraphQL API.</span>
 
 <span class="sd">    Due to the nature of graphql API, this class does not provide a specific</span>
 <span class="sd">    set of methods. Instead, you&#39;re expected to write your own queries and this</span>
 <span class="sd">    class will help you with pagination and network timeouts.</span>
+
+<span class="sd">    Basic usage:</span>
+
+<span class="sd">    &gt;&gt;&gt; api = GitHubAPIv4(&#39;github_api_tokens&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; api(&#39;&#39;&#39;query ($user: String!) {</span>
+<span class="sd">    ...       user(login:$user) {</span>
+<span class="sd">    ...         login, name</span>
+<span class="sd">    ...       }}&#39;&#39;&#39;, user=&#39;user2589&#39;)</span>
+<span class="sd">    {&#39;login&#39;: &#39;user2589&#39;, &#39;name&#39;: None}</span>
+
+<span class="sd">    &gt;&gt;&gt; list(api(&#39;&#39;&#39;query ($user: String!, $cursor: String) {</span>
+<span class="sd">    ...       user(login: $user) {</span>
+<span class="sd">    ...         followers(first:100, after:$cursor) {</span>
+<span class="sd">    ...           nodes { login }</span>
+<span class="sd">    ...           pageInfo{endCursor, hasNextPage}</span>
+<span class="sd">    ...     }}}&#39;&#39;&#39;, user=&#39;user2589&#39;))</span>
+<span class="sd">    [{&#39;login&#39;: &#39;ArefMq&#39;},</span>
+<span class="sd">     # ... more users</span>
+<span class="sd">     {&#39;login&#39;: &#39;neoascetic&#39;}]</span>
+
+<span class="sd">    In the first case, it will return a dictionary of user attributes.</span>
+<span class="sd">    In the second case, it will return a generator of repository issue objects,</span>
+<span class="sd">    handling the pagination transparently.</span>
+
+<span class="sd">    It looks a little bit like magic, but it is not. Here is how it works:</span>
+
+<span class="sd">    - first, it will parse the query and try to figure out the first object that</span>
+<span class="sd">        has multiple fields; in the first query, it is `user`. In the second,</span>
+<span class="sd">        it is `user.followers`.</span>
+<span class="sd">        The query parser is pretty naive, and is expected to fail on non-trivial</span>
+<span class="sd">        queries. In this case, you will need to explicitly tell what object you</span>
+<span class="sd">        want to retrieve. In the example below, we explicitly tell scraper the</span>
+<span class="sd">        path to the return object in the second positional argument:</span>
+
+<span class="sd">        &gt;&gt;&gt; api(&#39;...some query..&#39;,</span>
+<span class="sd">        ...     (&#39;repository&#39;, &#39;defaultBranchRef&#39;, &#39;target&#39;, &#39;history&#39;),</span>
+<span class="sd">        ...     owner=&#39;CMUSTRUDEL&#39;, repo=&#39;strudel.scraper&#39;)</span>
+
+<span class="sd">    - then, it will check if there is a `pageInfo` object in this object. If it</span>
+<span class="sd">        is not, it will simply return the content of this object; this is what</span>
+<span class="sd">        happened with the first query. If there IS a pagination object, it will</span>
+<span class="sd">        indicate we need pagination, and the content of `nodes` or `edges` will</span>
+<span class="sd">        be returned instead.</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
-<div class="viewcode-block" id="GitHubAPIv4.v4"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.v4">[docs]</a>    <span class="k">def</span> <span class="nf">v4</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">object_path</span><span class="o">=</span><span class="p">(),</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">v4</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">object_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot; Make an API v4 request, taking care of pagination</span>
 
 <span class="sd">        Args:</span>
@@ -386,8 +448,6 @@
 <span class="sd">        &gt;&gt;&gt; for follower in followers:</span>
 <span class="sd">        ...     pass</span>
 
-<span class="sd">        The method will look for `pageInfo` object in the object path and handle</span>
-<span class="sd">        pagination transparently.</span>
 
 <span class="sd">        However, the method will also return an iterator if the query is</span>
 <span class="sd">        expected to return a single result. In this case, you need to explicitly</span>
@@ -404,6 +464,8 @@
 <span class="sd">        ...       }}&#39;&#39;&#39;, (&#39;user&#39;,), user=user))</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">object_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">object_path</span> <span class="o">=</span> <span class="n">parse_graphql_path</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
 
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
             <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="n">query</span><span class="p">,</span> <span class="s1">&#39;variables&#39;</span><span class="p">:</span> <span class="n">params</span><span class="p">})</span>
@@ -424,58 +486,69 @@
                 <span class="k">raise</span> <span class="n">VCSError</span><span class="p">(</span><span class="s1">&#39;Invalid object path &quot;</span><span class="si">%s</span><span class="s1">&quot; in:</span><span class="se">\n</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span>
                                <span class="p">(</span><span class="n">object_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
 
-            <span class="n">has_next_page</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;hasNextPage&#39;</span><span class="p">))</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;hasNextPage&#39;</span><span class="p">)):</span>
+            <span class="n">page_info</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,))</span>
+            <span class="k">if</span> <span class="n">page_info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">objects</span>
                 <span class="k">return</span>
             <span class="c1"># This is due to inconsistency in graphql API.</span>
             <span class="c1"># In most cases, requests returning lists of objects put them in</span>
             <span class="c1"># &#39;nodes&#39;, but in few legacy methods they use &#39;edges&#39;</span>
             <span class="n">nodes</span> <span class="o">=</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;nodes&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;edges&#39;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">nodes</span><span class="p">:</span>
-                <span class="k">break</span>
+            <span class="k">if</span> <span class="n">nodes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">EnvironmentError</span><span class="p">(</span>
+                    <span class="s1">&#39;Unexpected result format. Please report an issue:</span><span class="se">\n</span><span class="s1">&#39;</span>
+                    <span class="s1">&#39;https://github.com/CMUSTRUDEL/strudel.scraper/issues/new&#39;</span><span class="p">)</span>
+
             <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">obj</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">json_path</span><span class="p">(</span><span class="n">page_info</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;hasNextPage&#39;</span><span class="p">,)):</span>
+                <span class="k">break</span>
             <span class="c1"># the result is single page, or there are no more pages</span>
-            <span class="n">params</span><span class="p">[</span><span class="s1">&#39;cursor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">objects</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;pageInfo&#39;</span><span class="p">,</span> <span class="s1">&#39;endCursor&#39;</span><span class="p">))</span></div>
+            <span class="n">params</span><span class="p">[</span><span class="s1">&#39;cursor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span><span class="p">(</span><span class="n">page_info</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;endCursor&#39;</span><span class="p">,))</span>
 
-<div class="viewcode-block" id="GitHubAPIv4.repo_issues"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.repo_issues">[docs]</a>    <span class="k">def</span> <span class="nf">repo_issues</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">cursor</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">object_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">):</span>
+        <span class="n">gen</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">object_path</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;pageInfo&#39;</span> <span class="ow">in</span> <span class="n">query</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">repo_issues</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">cursor</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">owner</span><span class="p">,</span> <span class="n">repo</span> <span class="o">=</span> <span class="n">repo_slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">            query ($owner: String!, $repo: String!, $cursor: String) {</span>
 <span class="s2">                repository(name: $repo, owner: $owner) {</span>
-<span class="s2">                  hasIssuesEnabled</span>
 <span class="s2">                    issues (first: 100, after: $cursor,</span>
 <span class="s2">                      orderBy: {field:CREATED_AT, direction: ASC}) {</span>
 <span class="s2">                        nodes {author </span><span class="si">{login}</span><span class="s2">, closed, createdAt,</span>
 <span class="s2">                               updatedAt, number, title}</span>
 <span class="s2">                        pageInfo {endCursor, hasNextPage}</span>
-<span class="s2">                }}</span>
-<span class="s2">            }&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;issues&#39;</span><span class="p">),</span> <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span></div>
+<span class="s2">            }}}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;issues&#39;</span><span class="p">),</span> <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">user_followers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">            query ($user: String!, $cursor: String) { </span>
+<span class="s2">            query ($user: String!, $cursor: String) {</span>
 <span class="s2">              user(login: $user) {</span>
 <span class="s2">                followers(first:100, after:$cursor) {</span>
 <span class="s2">                  nodes { login }</span>
 <span class="s2">                  pageInfo{endCursor, hasNextPage}</span>
 <span class="s2">            }}}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;followers&#39;</span><span class="p">),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
 
-<div class="viewcode-block" id="GitHubAPIv4.user_info"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.user_info">[docs]</a>    <span class="k">def</span> <span class="nf">user_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">user_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">            query ($user: String!) { </span>
-<span class="s2">              user(login:$user) { </span>
+<span class="s2">            query ($user: String!) {</span>
+<span class="s2">              user(login:$user) {</span>
 <span class="s2">                login, name, avatarUrl, websiteUrl</span>
 <span class="s2">                company, bio, location, name, twitterUsername, isHireable</span>
 <span class="s2">                # email  # email requires extra scopes from the API key</span>
 <span class="s2">                createdAt, updatedAt</span>
 <span class="s2">                followers</span><span class="si">{totalCount}</span><span class="s2"></span>
 <span class="s2">                following </span><span class="si">{totalCount}</span><span class="s2"></span>
-<span class="s2">              }}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">))</span></div>
+<span class="s2">              }}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">,),</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">))</span>
 
-<div class="viewcode-block" id="GitHubAPIv4.repo_commits"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPIv4.repo_commits">[docs]</a>    <span class="k">def</span> <span class="nf">repo_commits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">repo_commits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
         <span class="n">owner</span><span class="p">,</span> <span class="n">repo</span> <span class="o">=</span> <span class="n">repo_slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+        <span class="c1"># this is the case when we have to specify object path</span>
+        <span class="c1"># because of the &quot;... on Commit&quot; syntax</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">            query ($owner: String!, $repo: String!, $cursor: String) {</span>
 <span class="s2">            repository(name: $repo, owner: $owner) {</span>
@@ -491,7 +564,17 @@
 <span class="s2">                        }</span>
 <span class="s2">                        pageInfo {endCursor, hasNextPage}</span>
 <span class="s2">            }}}}}}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;defaultBranchRef&#39;</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">,</span> <span class="s1">&#39;history&#39;</span><span class="p">),</span>
-                       <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span></div></div>
+                       <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">repo_stargazers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>
+        <span class="n">owner</span><span class="p">,</span> <span class="n">repo</span> <span class="o">=</span> <span class="n">repo_slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">v4</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            query ($owner: String!, $repo: String!, $cursor: String) {</span>
+<span class="s2">            repository(name: $repo, owner: $owner) {</span>
+<span class="s2">                stargazers(first: 100, after: $cursor){</span>
+<span class="s2">                    nodes{ login }</span>
+<span class="s2">                    pageInfo {endCursor, hasNextPage}</span>
+<span class="s2">            }}}&quot;&quot;&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s1">&#39;repository&#39;</span><span class="p">,</span> <span class="s1">&#39;stargazers&#39;</span><span class="p">),</span> <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span> <span class="n">repo</span><span class="o">=</span><span class="n">repo</span><span class="p">)</span></div>
 
 
 <span class="k">def</span> <span class="nf">get_limits</span><span class="p">(</span><span class="n">tokens</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>

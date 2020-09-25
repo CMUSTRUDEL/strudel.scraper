@@ -71,18 +71,18 @@ def parse_url(url):
     return None, None
 
 
-def json_path(obj, *path):
+def json_path(obj, path, raise_on_missing=False):
     """ Get a dict value by the specified path.
 
     >>> obj = {'author': {'name': 'John'}, 'committer': None,
     ...        'labels': [{'name': 'Bug'}, {'name': 'Good first issue'}]}
-    >>> json_path(obj, 'author', 'name')
+    >>> json_path(obj, ('author', 'name'))
     'John'
-    >>> json_path(obj, 'committer', 'name') is None
+    >>> json_path(obj, ('committer', 'name')) is None
     True
-    >>> json_path(obj, 'committer') is None
+    >>> json_path(obj, ('committer',)) is None
     True
-    >>> json_path(obj, 'labels', ',name')
+    >>> json_path(obj, ('labels', ',name'))
     'Bug,Good first issue'
     """
     for chunk in path:
@@ -90,9 +90,12 @@ def json_path(obj, *path):
             obj = ",".join(str(item.get(chunk[1:])) for item in obj)
             # supported only for the last chunk in the path, so break
             break
-        obj = obj.get(chunk)
-        if obj is None:
-            break
+        if chunk not in obj:
+            if raise_on_missing:
+                raise IndexError('Path does not exist')
+            else:
+                return None
+        obj = obj[chunk]
     return obj
 
 
@@ -107,7 +110,7 @@ def json_map(mapping, obj):
     >>> json_map({"author_login": "author__name", 'foo': 'bar'}, obj)
     {'author_login': 'John', 'foo': None}
     """
-    return {key: json_path(obj, *path.split("__"))
+    return {key: json_path(obj, path.split("__"))
             for key, path in mapping.items()}
 
 

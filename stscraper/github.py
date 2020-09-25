@@ -317,14 +317,76 @@ class GitHubAPI(VCSAPI):
                 time.sleep(2**i)
 
 
+def parse_graphql_path(query):
+    """ Given a query, find object path.
+    This naive implementation doesn't account for many quircks in GitHub API.
+    In some cases, you still need to specify the path manually
+    """
+    path = []
+    query = re.sub(r'\(.*?\)', '', query.replace('\n', ' ').rstrip(' }'))
+    # skip the leading "query(...)" part
+    chunks = query.split('{')[1:]
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if chunk in ('nodes', 'edges') or any(c in chunk for c in ' ,}'):
+            break
+        path.append(chunk)
+    return path
+
+
 class GitHubAPIv4(GitHubAPI):
     """ An interface to GitHub v4 GraphQL API.
 
     Due to the nature of graphql API, this class does not provide a specific
     set of methods. Instead, you're expected to write your own queries and this
     class will help you with pagination and network timeouts.
+
+    Basic usage:
+
+    >>> api = GitHubAPIv4('github_api_tokens')
+    >>> api('''query ($user: String!) {
+    ...       user(login:$user) {
+    ...         login, name
+    ...       }}''', user='user2589')
+    {'login': 'user2589', 'name': None}
+
+    >>> list(api('''query ($user: String!, $cursor: String) {
+    ...       user(login: $user) {
+    ...         followers(first:100, after:$cursor) {
+    ...           nodes { login }
+    ...           pageInfo{endCursor, hasNextPage}
+    ...     }}}''', user='user2589'))
+    [{'login': 'ArefMq'},
+     # ... more users
+     {'login': 'neoascetic'}]
+
+    In the first case, it will return a dictionary of user attributes.
+    In the second case, it will return a generator of repository issue objects,
+    handling the pagination transparently.
+
+    It looks a little bit like magic, but it is not. Here is how it works:
+
+    - first, it will parse the query and try to figure out the first object that
+        has multiple fields; in the first query, it is `user`. In the second,
+        it is `user.followers`.
+        The query parser is pretty naive, and is expected to fail on non-trivial
+        queries. In this case, you will need to explicitly tell what object you
+        want to retrieve. In the example below, we explicitly tell scraper the
+        path to the return object in the second positional argument:
+
+        >>> api('...some query..',
+        ...     ('repository', 'defaultBranchRef', 'target', 'history'),
+        ...     owner='CMUSTRUDEL', repo='strudel.scraper')
+
+    - then, it will check if there is a `pageInfo` object in this object. If it
+        is not, it will simply return the content of this object; this is what
+        happened with the first query. If there IS a pagination object, it will
+        indicate we need pagination, and the content of `nodes` or `edges` will
+        be returned instead.
+
     """
-    def v4(self, query, object_path=(), **params):
+
+    def v4(self, query, object_path=None, **params):
         """ Make an API v4 request, taking care of pagination
 
         Args:
@@ -352,8 +414,6 @@ class GitHubAPIv4(GitHubAPI):
         >>> for follower in followers:
         ...     pass
 
-        The method will look for `pageInfo` object in the object path and handle
-        pagination transparently.
 
         However, the method will also return an iterator if the query is
         expected to return a single result. In this case, you need to explicitly
@@ -370,6 +430,8 @@ class GitHubAPIv4(GitHubAPI):
         ...       }}''', ('user',), user=user))
 
         """
+        if object_path is None:
+            object_path = parse_graphql_path(query)
 
         while True:
             payload = json.dumps({'query': query, 'variables': params})
@@ -410,23 +472,27 @@ class GitHubAPIv4(GitHubAPI):
             # the result is single page, or there are no more pages
             params['cursor'] = json_path(page_info, ('endCursor',))
 
+    def __call__(self, query, object_path=None, **params):
+        gen = self.v4(query, object_path, **params)
+        if 'pageInfo' in query:
+            return iter(gen)
+        return next(gen)
+
     def repo_issues(self, repo_slug, cursor=None):
         owner, repo = repo_slug.split('/')
         return self.v4("""
             query ($owner: String!, $repo: String!, $cursor: String) {
                 repository(name: $repo, owner: $owner) {
-                  hasIssuesEnabled
                     issues (first: 100, after: $cursor,
                       orderBy: {field:CREATED_AT, direction: ASC}) {
                         nodes {author {login}, closed, createdAt,
                                updatedAt, number, title}
                         pageInfo {endCursor, hasNextPage}
-                }}
-            }""", ('repository', 'issues'), owner=owner, repo=repo)
+            }}}""", ('repository', 'issues'), owner=owner, repo=repo)
 
     def user_followers(self, user):
         return self.v4("""
-            query ($user: String!, $cursor: String) { 
+            query ($user: String!, $cursor: String) {
               user(login: $user) {
                 followers(first:100, after:$cursor) {
                   nodes { login }
@@ -435,8 +501,8 @@ class GitHubAPIv4(GitHubAPI):
 
     def user_info(self, user):
         return next(self.v4("""
-            query ($user: String!) { 
-              user(login:$user) { 
+            query ($user: String!) {
+              user(login:$user) {
                 login, name, avatarUrl, websiteUrl
                 company, bio, location, name, twitterUsername, isHireable
                 # email  # email requires extra scopes from the API key
@@ -447,6 +513,8 @@ class GitHubAPIv4(GitHubAPI):
 
     def repo_commits(self, repo_slug):
         owner, repo = repo_slug.split("/")
+        # this is the case when we have to specify object path
+        # because of the "... on Commit" syntax
         return self.v4("""
             query ($owner: String!, $repo: String!, $cursor: String) {
             repository(name: $repo, owner: $owner) {
@@ -463,6 +531,16 @@ class GitHubAPIv4(GitHubAPI):
                         pageInfo {endCursor, hasNextPage}
             }}}}}}""", ('repository', 'defaultBranchRef', 'target', 'history'),
                        owner=owner, repo=repo)
+
+    def repo_stargazers(self, repo_slug):
+        owner, repo = repo_slug.split("/")
+        return self.v4("""
+            query ($owner: String!, $repo: String!, $cursor: String) {
+            repository(name: $repo, owner: $owner) {
+                stargazers(first: 100, after: $cursor){
+                    nodes{ login }
+                    pageInfo {endCursor, hasNextPage}
+            }}}""", ('repository', 'stargazers'), owner=owner, repo=repo)
 
 
 def get_limits(tokens=None):

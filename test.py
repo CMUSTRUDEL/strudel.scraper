@@ -253,6 +253,43 @@ class TestGitHubv4(unittest.TestCase):
         self.api = stscraper.GitHubAPIv4()
         self.repo_address = 'pandas-dev/pandas'
 
+    def test_parse_graphql_path(self):
+        test_data = (  # query, path
+            ('''query ($owner: String!, $repo: String!, $cursor: String) {
+                repository(name: $repo, owner: $owner) {
+                    issues (first: 100, after: $cursor,
+                      orderBy: {field:CREATED_AT, direction: ASC}) {
+                        nodes {author {login}, closed, createdAt,
+                               updatedAt, number, title}
+                        pageInfo {endCursor, hasNextPage}
+            }}}''', ['repository', 'issues']),
+            ('''query ($user: String!, $cursor: String) {
+              user(login: $user) {
+                followers(first:100, after:$cursor) {
+                  nodes { login }
+                  pageInfo{endCursor, hasNextPage}
+            }}}''', ['user', 'followers']),
+            ('''query ($user: String!) {
+              user(login:$user) {
+                login, name, avatarUrl, websiteUrl
+                company, bio, location, name, twitterUsername, isHireable
+                # email  # email requires extra scopes from the API key
+                createdAt, updatedAt
+                followers{totalCount}
+                following {totalCount}
+              }}''', ['user']),
+            ('''query ($owner: String!, $repo: String!, $cursor: String) {
+            repository(name: $repo, owner: $owner) {
+                stargazers(first: 100, after: $cursor){
+                    nodes{ login }
+                    pageInfo {endCursor, hasNextPage}
+            }}}''', ['repository', 'stargazers']),
+            ('''query ($user: String!) {
+                user(login:$user) { login, name }}''', ['user'])
+        )
+        for query, path in test_data:
+            self.assertEqual(stscraper.parse_graphql_path(query), path)
+
     def test_user_info(self):
         # Docs: https://developer.github.com/v3/users/#response
         user_info = self.api.user_info('user2589')
@@ -264,8 +301,27 @@ class TestGitHubv4(unittest.TestCase):
             self.assertIn(prop, user_info)
 
     def test_pagination(self):
+        # more than one page
         commits = list(self.api.repo_commits('benjaminp/six'))
         self.assertGreater(len(commits), 463)
+
+        # only one page
+        issues = list(self.api.repo_issues('user2589/Toggl.py'))
+        self.assertGreater(len(issues), 0)
+
+    def test_api(self):
+        stargazers = list(self.api('''
+            query ($owner: String!, $repo: String!, $cursor: String) {
+            repository(name: $repo, owner: $owner) {
+                stargazers(first: 100, after: $cursor){
+                    nodes{ login }
+                    pageInfo {endCursor, hasNextPage}
+            }}}''', owner='CMUSTRUDEL', repo='strudel.scraper'))
+        self.assertGreater(len(stargazers), 1)
+
+        user_info = self.api('''query ($user: String!) {
+           user(login:$user) { login, name }}''', user='user2589')
+        self.assertEqual(user_info['login'], 'user2589')
 
 
 if __name__ == "__main__":

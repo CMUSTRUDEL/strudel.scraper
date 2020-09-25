@@ -66,5 +66,4 @@ GraphQL (v4) API
 ----------------
 
 .. autoclass:: GitHubAPIv4
-    :members:
 

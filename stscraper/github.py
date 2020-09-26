@@ -361,8 +361,8 @@ class GitHubAPIv4(GitHubAPI):
      {'login': 'neoascetic'}]
 
     In the first case, it will return a dictionary of user attributes.
-    In the second case, it will return a generator of repository issue objects,
-    handling the pagination transparently.
+    In the second case, it will return a generator of objects, handling
+    pagination transparently.
 
     It looks a little bit like magic, but it is not. Here is how it works:
 
@@ -441,7 +441,7 @@ class GitHubAPIv4(GitHubAPI):
                 return
 
             res = self.extract_result(r)
-            if 'data' not in res:
+            if 'errors' in res or 'data' not in res:
                 raise VCSError('API didn\'t return any data:\n' +
                                json.dumps(res, indent=4))
             data = res['data']

@@ -90,7 +90,7 @@ def json_path(obj, path, raise_on_missing=False):
             obj = ",".join(str(item.get(chunk[1:])) for item in obj)
             # supported only for the last chunk in the path, so break
             break
-        if chunk not in obj:
+        if obj is None or chunk not in obj:
             if raise_on_missing:
                 raise IndexError('Path does not exist')
             else:

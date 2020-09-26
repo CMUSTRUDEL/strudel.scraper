@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stscraper.github &#8212; strudel.scraper 1.1.0 documentation</title>
+    <title>stscraper.github &#8212; strudel.scraper 1.2.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -395,8 +395,8 @@
 <span class="sd">     {&#39;login&#39;: &#39;neoascetic&#39;}]</span>
 
 <span class="sd">    In the first case, it will return a dictionary of user attributes.</span>
-<span class="sd">    In the second case, it will return a generator of repository issue objects,</span>
-<span class="sd">    handling the pagination transparently.</span>
+<span class="sd">    In the second case, it will return a generator of objects, handling</span>
+<span class="sd">    pagination transparently.</span>
 
 <span class="sd">    It looks a little bit like magic, but it is not. Here is how it works:</span>
 
@@ -475,7 +475,7 @@
                 <span class="k">return</span>
 
             <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_result</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
-            <span class="k">if</span> <span class="s1">&#39;data&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;errors&#39;</span> <span class="ow">in</span> <span class="n">res</span> <span class="ow">or</span> <span class="s1">&#39;data&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">VCSError</span><span class="p">(</span><span class="s1">&#39;API didn</span><span class="se">\&#39;</span><span class="s1">t return any data:</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span>
                                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">))</span>
             <span class="n">data</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">]</span>

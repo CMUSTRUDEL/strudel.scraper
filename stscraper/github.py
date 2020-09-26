@@ -431,7 +431,7 @@ class GitHubAPIv4(GitHubAPI):
 
         """
         if object_path is None:
-            object_path = parse_graphql_path(query)
+            object_path = parse_graphql_path(query) or ()
 
         while True:
             payload = json.dumps({'query': query, 'variables': params})

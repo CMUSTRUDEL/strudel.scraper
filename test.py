@@ -323,6 +323,48 @@ class TestGitHubv4(unittest.TestCase):
            user(login:$user) { login, name }}''', user='user2589')
         self.assertEqual(user_info['login'], 'user2589')
 
+    def test_nodes(self):
+        # objects are in nodes and single object tested by test_api
+
+        # objects are in edges:
+        self.assertGreater(len(list(self.api('''
+            query ($owner: String!, $repo: String!, $cursor: String) {
+            repository(name: $repo, owner: $owner) {
+                stargazers(first: 100, after: $cursor){
+                    edges{
+                        node{ login }
+                        starredAt
+                    }
+                    pageInfo {endCursor, hasNextPage}
+            }}}''', owner='cmustrudel', repo='strudel.scraper'))), 0)
+
+        # empty nodes:
+        self.assertEqual(list(self.api('''
+            query ($owner: String!, $repo: String!, $cursor: String) {
+            repository(name: $repo, owner: $owner) {
+                releases(first: 100, after: $cursor) {
+                    nodes { createdAt}
+                    pageInfo {endCursor, hasNextPage}
+            }}}''', ('repository', 'releases'),
+            owner='user2589', repo='Toggl.py')), [])
+
+    def test_error(self):
+        # invalid query
+        self.assertRaises(
+            stscraper.VCSError, lambda: self.api('lkasjdfl askjdf'))
+
+        # nonexistent repo
+        def stargazers():
+            return list(self.api('''
+                query ($owner: String!, $repo: String!, $cursor: String) {
+                    repository(name: $repo, owner: $owner) {
+                        stargazers(first: 100, after: $cursor){
+                            nodes{ login }
+                            pageInfo {endCursor, hasNextPage}
+                    }}}''', owner='user2589', repo='laskdjflaskdjf'))
+
+        self.assertRaises(stscraper.VCSError, stargazers)
+
 
 if __name__ == "__main__":
     unittest.main()

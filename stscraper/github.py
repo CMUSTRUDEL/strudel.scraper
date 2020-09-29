@@ -431,7 +431,7 @@ class GitHubAPIv4(GitHubAPI):
 
         """
         if object_path is None:
-            object_path = parse_graphql_path(query)
+            object_path = parse_graphql_path(query) or ()
 
         while True:
             payload = json.dumps({'query': query, 'variables': params})
@@ -459,7 +459,7 @@ class GitHubAPIv4(GitHubAPI):
             # This is due to inconsistency in graphql API.
             # In most cases, requests returning lists of objects put them in
             # 'nodes', but in few legacy methods they use 'edges'
-            nodes = objects.get('nodes') or objects.get('edges')
+            nodes = objects.get('nodes', objects.get('edges'))
             if nodes is None:
                 raise EnvironmentError(
                     'Unexpected result format. Please report an issue:\n'

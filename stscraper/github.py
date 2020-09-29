@@ -459,7 +459,7 @@ class GitHubAPIv4(GitHubAPI):
             # This is due to inconsistency in graphql API.
             # In most cases, requests returning lists of objects put them in
             # 'nodes', but in few legacy methods they use 'edges'
-            nodes = objects.get('nodes') or objects.get('edges')
+            nodes = objects.get('nodes', objects.get('edges'))
             if nodes is None:
                 raise EnvironmentError(
                     'Unexpected result format. Please report an issue:\n'

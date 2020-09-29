@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stscraper.github &#8212; strudel.scraper 1.2.0 documentation</title>
+    <title>stscraper.github &#8212; strudel.scraper 1.2.1 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -465,7 +465,7 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">object_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">object_path</span> <span class="o">=</span> <span class="n">parse_graphql_path</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">object_path</span> <span class="o">=</span> <span class="n">parse_graphql_path</span><span class="p">(</span><span class="n">query</span><span class="p">)</span> <span class="ow">or</span> <span class="p">()</span>
 
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
             <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s1">&#39;query&#39;</span><span class="p">:</span> <span class="n">query</span><span class="p">,</span> <span class="s1">&#39;variables&#39;</span><span class="p">:</span> <span class="n">params</span><span class="p">})</span>
@@ -493,7 +493,7 @@
             <span class="c1"># This is due to inconsistency in graphql API.</span>
             <span class="c1"># In most cases, requests returning lists of objects put them in</span>
             <span class="c1"># &#39;nodes&#39;, but in few legacy methods they use &#39;edges&#39;</span>
-            <span class="n">nodes</span> <span class="o">=</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;nodes&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;edges&#39;</span><span class="p">)</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;nodes&#39;</span><span class="p">,</span> <span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;edges&#39;</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">nodes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">EnvironmentError</span><span class="p">(</span>
                     <span class="s1">&#39;Unexpected result format. Please report an issue:</span><span class="se">\n</span><span class="s1">&#39;</span>

@@ -10,6 +10,20 @@ import warnings
 from .base import *
 import stutils
 
+# This is a list of preview features
+# https://developer.github.com/v3/previews/
+# https://developer.github.com/v4/previews
+accept_headers = (
+    # v3 repository topics
+    'application/vnd.github.mercy-preview+json,'
+    # v3 reactions
+    'application/vnd.github.squirrel-girl-preview,'
+    # project event details
+    'application/vnd.github.starfox-preview+json,'
+    # dependency graph access
+    'application/vnd.github.hawkgirl-preview+json'
+)
+
 
 class GitHubAPIToken(APIToken):
     api_url = 'https://api.github.com/'
@@ -25,10 +39,7 @@ class GitHubAPIToken(APIToken):
         # mercy-preview: repo topics
         # squirrel-girl-preview: issue reactions
         # starfox-preview: issue events
-        self._headers = {
-            'Accept': 'application/vnd.github.mercy-preview+json,'
-                      'application/vnd.github.squirrel-girl-preview,'
-                      'application/vnd.github.starfox-preview+json'}
+        self._headers = {'Accept': accept_headers}
         if token is not None:
             self.token = token
             self._headers['Authorization'] = 'token ' + token

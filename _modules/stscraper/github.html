@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stscraper.github &#8212; strudel.scraper 1.2.1 documentation</title>
+    <title>stscraper.github &#8212; strudel.scraper 1.2.2 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -44,6 +44,20 @@
 <span class="kn">from</span> <span class="nn">.base</span> <span class="k">import</span> <span class="o">*</span>
 <span class="kn">import</span> <span class="nn">stutils</span>
 
+<span class="c1"># This is a list of preview features</span>
+<span class="c1"># https://developer.github.com/v3/previews/</span>
+<span class="c1"># https://developer.github.com/v4/previews</span>
+<span class="n">accept_headers</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="c1"># v3 repository topics</span>
+    <span class="s1">&#39;application/vnd.github.mercy-preview+json,&#39;</span>
+    <span class="c1"># v3 reactions</span>
+    <span class="s1">&#39;application/vnd.github.squirrel-girl-preview,&#39;</span>
+    <span class="c1"># project event details</span>
+    <span class="s1">&#39;application/vnd.github.starfox-preview+json,&#39;</span>
+    <span class="c1"># dependency graph access</span>
+    <span class="s1">&#39;application/vnd.github.hawkgirl-preview+json&#39;</span>
+<span class="p">)</span>
+
 
 <span class="k">class</span> <span class="nc">GitHubAPIToken</span><span class="p">(</span><span class="n">APIToken</span><span class="p">):</span>
     <span class="n">api_url</span> <span class="o">=</span> <span class="s1">&#39;https://api.github.com/&#39;</span>
@@ -59,10 +73,7 @@
         <span class="c1"># mercy-preview: repo topics</span>
         <span class="c1"># squirrel-girl-preview: issue reactions</span>
         <span class="c1"># starfox-preview: issue events</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_headers</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s1">&#39;Accept&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.github.mercy-preview+json,&#39;</span>
-                      <span class="s1">&#39;application/vnd.github.squirrel-girl-preview,&#39;</span>
-                      <span class="s1">&#39;application/vnd.github.starfox-preview+json&#39;</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_headers</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Accept&#39;</span><span class="p">:</span> <span class="n">accept_headers</span><span class="p">}</span>
         <span class="k">if</span> <span class="n">token</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">token</span> <span class="o">=</span> <span class="n">token</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_headers</span><span class="p">[</span><span class="s1">&#39;Authorization&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;token &#39;</span> <span class="o">+</span> <span class="n">token</span>

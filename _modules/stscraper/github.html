@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stscraper.github &#8212; strudel.scraper 1.2.2 documentation</title>
+    <title>stscraper.github &#8212; strudel.scraper 1.3.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -230,6 +230,12 @@
 <span class="sd">        Note that GitHub API might ignore some merge commits&quot;&quot;&quot;</span>
         <span class="c1"># https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository</span>
         <span class="k">return</span> <span class="n">repo_slug</span></div>
+
+<div class="viewcode-block" id="GitHubAPI.repo_commit"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_commit">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/commits/</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">repo_commit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">commit_hash</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get details for a single commit.&quot;&quot;&quot;</span>
+        <span class="c1"># https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#get-a-commit</span>
+        <span class="k">return</span> <span class="n">repo_slug</span><span class="p">,</span> <span class="n">commit_hash</span></div>
 
 <div class="viewcode-block" id="GitHubAPI.repo_pulls"><a class="viewcode-back" href="../../index.html#stscraper.GitHubAPI.repo_pulls">[docs]</a>    <span class="nd">@api</span><span class="p">(</span><span class="s1">&#39;repos/</span><span class="si">%s</span><span class="s1">/pulls&#39;</span><span class="p">,</span> <span class="n">paginate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">repo_pulls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">repo_slug</span><span class="p">):</span>

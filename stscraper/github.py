@@ -197,6 +197,12 @@ class GitHubAPI(VCSAPI):
         # https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
         return repo_slug
 
+    @api('repos/%s/commits/%s')
+    def repo_commit(self, repo_slug, commit_hash):
+        """Get details for a single commit."""
+        # https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#get-a-commit
+        return repo_slug, commit_hash
+
     @api('repos/%s/pulls', paginate=True, state='all')
     def repo_pulls(self, repo_slug):
         """Get all repository pull requests.

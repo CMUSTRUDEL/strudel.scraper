@@ -114,31 +114,6 @@ def json_map(mapping, obj):
             for key, path in mapping.items()}
 
 
-# syntax sugar for GET API calls
-def api(url, paginate=False, **params):
-    def wrapper(func):
-        @wraps(func)
-        def caller(self, *args):
-            formatted_url = url % func(self, *args)
-            if paginate:
-                return self.request(formatted_url, paginate=True, **params)
-            else:
-                return next(self.request(formatted_url, **params))
-        return caller
-    return wrapper
-
-
-def api_filter(filter_func):
-    def wrapper(func):
-        @wraps(func)
-        def caller(*args):
-            for item in func(*args):
-                if filter_func(item):
-                    yield item
-        return caller
-    return wrapper
-
-
 class APIToken(object):
     """ An abstract container for an API token
     """
@@ -365,7 +340,8 @@ class VCSAPI(object):
                 return
 
     def _request(self, url, method='get', data=None, **params):
-        """ Make
+        """ Make an API request for a single page or an object.
+
         Args:
             url (str): request URL
             method (str): HTTP method type
@@ -411,75 +387,6 @@ class VCSAPI(object):
 
             r.raise_for_status()
             return r
-
-    def all_users(self):
-        # type: () -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def all_repos(self):
-        # type: () -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def repo_info(self, repo_slug):
-        # type: (Union[str, unicode]) -> Iterator[dict]
-        raise NotImplementedError
-
-    def repo_issues(self, repo_slug):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def repo_commits(self, repo_slug):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def repo_pulls(self, repo_slug):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def pull_request_commits(self, repo, pr_id):
-        # type: (str, int) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def issue_comments(self, repo, issue_id):
-        # type: (str, int) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def review_comments(self, repo, pr_id):
-        # type: (str, int) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def user_info(self, user):
-        # type: (str) -> dict
-        """ """
-        raise NotImplementedError
-
-    def user_repos(self, user):
-        # type: (str) -> dict
-        """Get list of user repositories"""
-        raise NotImplementedError
-
-    def user_orgs(self, user):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def org_members(self, org):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
-
-    def org_repos(self, org):
-        # type: (str) -> Iterable[dict]
-        """ """
-        raise NotImplementedError
 
     @staticmethod
     def project_exists(repo_slug):

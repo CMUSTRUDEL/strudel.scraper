@@ -146,70 +146,78 @@ class GitHubAPI(VCSAPI):
                 return True
         return False
 
+    def __call__(self, url, paginate=False, **params):
+        if paginate:
+            return self.request(url, paginate=True, **params)
+        else:
+            return next(self.request(url, **params))
+
     # ===================================
     #           API methods
     # ===================================
-    @api('users', paginate=True)
     def all_users(self):
         """Get all GitHub users"""
         # https://developer.github.com/v3/users/#get-all-users
-        return ()
+        return self('users', paginate=True)
 
-    @api('repositories', paginate=True)
     def all_repos(self):
         """Get all GitHub repositories"""
         # https://developer.github.com/v3/repos/#list-all-public-repositories
-        return ()
+        return self('repositories', paginate=True)
 
-    @api('repos/%s')
     def repo_info(self, repo_slug):
         """Get repository info"""
         # https://developer.github.com/v3/repos/#get
-        return repo_slug
+        return self('repos/' + repo_slug)
 
-    @api_filter(lambda issue: 'pull_request' not in issue)
-    @api('repos/%s/issues', paginate=True, state='all')
-    def repo_issues(self, repo_slug):
-        """Get repository issues (not including pull requests)"""
+    def repo_issues(self, repo_slug, state='all'):
+        """Get repository issues (not including pull requests)
+
+        Args:
+            repo_slug (str): `owner/repository` string
+            state (str): one of {open,closed,all}
+        """
         # https://developer.github.com/v3/issues/#list-issues-for-a-repository
-        return repo_slug
+        for issue in self('repos/%s/issues' % repo_slug):
+            if 'pull_request' not in issue:
+                yield issue
 
-    @api('repos/%s/issues/comments', paginate=True)
     def repo_issue_comments(self, repo_slug):
         """ Get all comments in all issues and pull requests,
         both open and closed.
         """
         # https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
-        return repo_slug
+        return self('repos/%s/issues/comments' % repo_slug, paginate=True)
 
-    @api('repos/%s/issues/events', paginate=True)
     def repo_issue_events(self, repo_slug):
         """ Get all events in all issues and pull requests,
         both open and closed.
         """
         # https://developer.github.com/v3/issues/events/#list-events-for-a-repository
-        return repo_slug
+        return self('repos/%s/issues/events' % repo_slug, paginate=True)
 
-    @api('repos/%s/commits', paginate=True)
     def repo_commits(self, repo_slug):
         """Get all repository commits.
         Note that GitHub API might ignore some merge commits"""
         # https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
-        return repo_slug
+        return self('repos/%s/commits' % repo_slug, paginate=True)
 
-    @api('repos/%s/commits/%s')
     def repo_commit(self, repo_slug, commit_hash):
         """Get details for a single commit."""
         # https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#get-a-commit
-        return repo_slug, commit_hash
+        return self('repos/%s/commits/%s' % (repo_slug, commit_hash))
 
-    @api('repos/%s/pulls', paginate=True, state='all')
-    def repo_pulls(self, repo_slug):
+    def repo_pulls(self, repo_slug, state='all'):
         """Get all repository pull requests.
         Unlike the issues API, this method will return information specific for
-        pull requests, like head SHAs and branch names."""
-        # https://developer.github.com/v3/pulls/#list-pull-requests
-        return repo_slug
+        pull requests, like head SHAs and branch names.
+
+        Args:
+            repo_slug (str): `owner/repository` string
+            state (str): one of {open,closed,all}
+        """
+        # https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls#list-pull-requests
+        return self('repos/%s/pulls' % repo_slug, paginate=True, state=state)
 
     def repo_topics(self, repo_slug):
         """Get a tuple of repository topics.
@@ -218,8 +226,7 @@ class GitHubAPI(VCSAPI):
         >>> GitHubAPI().repo_topics('pandas-dev/pandas')
         ('data-analysis', 'pandas', 'flexible', 'alignment', 'python')
         """
-        return tuple(
-            next(self.request('repos/%s/topics' % repo_slug)).get('names'))
+        return tuple(self('repos/%s/topics' % repo_slug).get('names'))
 
     def repo_labels(self, repo_slug):
         """Get a tuple of repository labels.
@@ -229,7 +236,7 @@ class GitHubAPI(VCSAPI):
         ('2/3 Compat', '32bit', 'API - Consistency', 'API Design', 'Admin')
         """
         return tuple(label['name'] for label in
-                     self.request('repos/%s/labels' % repo_slug, paginate=True))
+                     self('repos/%s/labels' % repo_slug, paginate=True))
 
     def repo_contributors(self, repo_slug):
         """Get a timeline of up to 100 top project contributors
@@ -248,75 +255,69 @@ class GitHubAPI(VCSAPI):
         """
         # https://developer.github.com/v3/repos/statistics/#get-all-contributor-commit-activity
         url = 'repos/%s/stats/contributors' % repo_slug
-        for contributor_stats in next(self.request(url)):
+        for contributor_stats in self.request(url):
             record = {w['w']: w['c'] for w in contributor_stats['weeks']}
             record['user'] = json_path(contributor_stats, ('author', 'login'))
             yield record
 
-    @api('repos/%s/pulls/%d/commits', paginate=True, state='all')
     def pull_request_commits(self, repo, pr_id):
         """Get commits in a pull request.
         `pr_id` is the visible pull request number, not internal GitHub id.
         """
-        # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
-        return repo, pr_id
+        # https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls#list-commits-on-a-pull-request
+        return self('repos/%s/pulls/%d/commits' % (repo, pr_id),
+                    paginate=True)
 
-    @api('repos/%s/issues/%s/comments', paginate=True, state='all')
     def issue_comments(self, repo, issue_id):
         """ Get comments on an issue or a pull request.
         Note that for pull requests this method will return only general
         comments to the pull request, but not review comments related to some
         code. Use review_comments() to get those instead.
         """
-        # https://developer.github.com/v3/issues/comments/#list-comments-on-an-issue
-        return repo, issue_id
+        # https://docs.github.com/en/free-pro-team@latest/rest/reference/issues#list-issue-comments
+        return self('repos/%s/issues/%s/comments' % (repo, issue_id),
+                    paginate=True)
 
-    @api('repos/%s/pulls/%s/comments', paginate=True, state='all')
     def review_comments(self, repo, pr_id):
         """ Get pull request comments related to some code.
-        This will not return general comments, see `issue_comments()`
+        For general comments, see `issue_comments()` instead.
         """
-        # https://developer.github.com/v3/pulls/comments/
-        return repo, pr_id
+        # https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls#list-review-comments-on-a-pull-request
+        return self('repos/%s/pulls/%s/comments' % (repo, pr_id), paginate=True)
 
-    @api('users/%s')
     def user_info(self, username):
         """Get user info - name, location, blog etc."""
         # Docs: https://developer.github.com/v3/users/#response
-        return username
+        return self('users/' + username)
 
-    @api('users/%s/repos', paginate=True)
     def user_repos(self, username):
         """Get list of user repositories"""
         # https://developer.github.com/v3/repos/#list-user-repositories
-        return username
+        return self('users/%s/repos' % username, paginate=True)
 
-    @api('users/%s/orgs', paginate=True)
     def user_orgs(self, username):
         """Get user organization membership.
         Usually includes only public memberships, but for yourself you get
         non-public as well."""
         # https://developer.github.com/v3/orgs/#list-user-organizations
-        return username
+        return self('users/%s/orgs' % username, paginate=True)
 
-    @api('orgs/%s/members', paginate=True)
     def org_members(self, org):
         """Get public organization members.
         Note that if you are a member of the organization you'll get everybody.
         """
         # https://developer.github.com/v3/orgs/members/#members-list
-        return org
+        return self('orgs/%s/members' % org, paginate=True)
 
-    @api('orgs/%s/repos', paginate=True)
     def org_repos(self, org):
         """Get organization repositories"""
-        return org
+        return self('orgs/%s/repos' % org, paginate=True)
 
-    @api('repos/%s/issues/%d/events', paginate=True)
     def issue_events(self, repo, issue_no):
         """Get issue events.
         This includes state changes, references, labels etc. """
-        return repo, issue_no
+        return self('repos/%s/issues/%d/events' % (repo, issue_no),
+                    paginate=True)
 
     # ===================================
     #        Non-API methods

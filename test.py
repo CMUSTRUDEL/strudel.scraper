@@ -54,7 +54,7 @@ class TestGitHub(unittest.TestCase):
         finally:
             sys.stdout = old_stdout
 
-    def _test_commits(self, commit):
+    def _test_commit(self, commit):
         self.assertIsInstance(commit, dict)
         for prop in ('sha', 'commit', 'author', 'committer', 'parents'):
             self.assertIn(prop, commit,
@@ -156,7 +156,13 @@ class TestGitHub(unittest.TestCase):
         commits = self.api.repo_commits(self.repo_address)
         self.assertIsInstance(commits, Generator)
         commit = next(commits)
-        self._test_commits(commit)
+        self._test_commit(commit)
+
+    def test_repo_commit(self):
+        commit = self.api.repo_commit(
+            'cmustrudel/strudel.scraper', '6adbcd5fbbee057dae4802a2b7099f3f35999e4a')
+        self.assertIsInstance(commit, dict)
+        self._test_commit(commit)
 
     def test_repo_pulls(self):
         pulls = self.api.repo_pulls(self.repo_address)
@@ -178,7 +184,7 @@ class TestGitHub(unittest.TestCase):
         commits = self.api.pull_request_commits(self.repo_address, 22457)
         self.assertIsInstance(commits, Generator)
         commit = next(commits)
-        self._test_commits(commit)
+        self._test_commit(commit)
 
     def test_issue_comments(self):
         comments = self.api.issue_comments(self.repo_address, 22473)
